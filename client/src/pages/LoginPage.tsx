@@ -40,7 +40,7 @@ export function LoginPage() {
             <Phone size={26} />
           </div>
           <h1 className="text-xl font-bold text-slate-800">CleanShip CRM</h1>
-          <p className="text-sm text-slate-400">Telecaller Management</p>
+          <p className="text-sm text-slate-400">User Management</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

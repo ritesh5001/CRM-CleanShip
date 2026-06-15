@@ -28,10 +28,10 @@ export function TelecallerFormModal({ open, onClose, editing }: Props) {
     try {
       if (isEdit) {
         await update.mutateAsync({ id: editing!._id, name, phone, dailyTarget });
-        toast.success('Telecaller updated');
+        toast.success('User updated');
       } else {
         await create.mutateAsync({ name, email, phone, password, dailyTarget });
-        toast.success('Telecaller created');
+        toast.success('User created');
       }
       onClose();
     } catch (err) {
@@ -43,7 +43,7 @@ export function TelecallerFormModal({ open, onClose, editing }: Props) {
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Edit telecaller' : 'Add telecaller'}
+      title={isEdit ? 'Edit user' : 'Add user'}
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
@@ -58,7 +58,7 @@ export function TelecallerFormModal({ open, onClose, editing }: Props) {
       <div className="space-y-3">
         <div>
           <Label>Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Telecaller name" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="User name" />
         </div>
         <div>
           <Label>Email</Label>

@@ -77,7 +77,7 @@ export function AppLayout() {
             <span className="font-bold text-slate-800">CleanShip CRM</span>
           </div>
           <div className="hidden text-sm text-slate-500 md:block">
-            {user?.role === 'superadmin' ? 'Administrator' : 'Telecaller'} workspace
+            {user?.role === 'superadmin' ? 'Administrator' : 'User'} workspace
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />

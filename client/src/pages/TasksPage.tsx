@@ -55,7 +55,7 @@ export function TasksPage() {
         {isLoading ? (
           <Spinner />
         ) : !data?.data.length ? (
-          <EmptyState title="No tasks" hint={isAdmin ? 'Assign a task to a telecaller.' : 'You have no tasks right now.'} />
+          <EmptyState title="No tasks" hint={isAdmin ? 'Assign a task to a user.' : 'You have no tasks right now.'} />
         ) : (
           <div className="divide-y divide-slate-100">
             {data.data.map((task) => {

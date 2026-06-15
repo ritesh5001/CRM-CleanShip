@@ -37,10 +37,10 @@ export function TelecallersPage() {
   }
 
   async function handleDelete(u: User) {
-    if (!confirm(`Delete telecaller "${u.name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete user "${u.name}"? This cannot be undone.`)) return;
     try {
       await del.mutateAsync(u._id);
-      toast.success('Telecaller deleted');
+      toast.success('User deleted');
     } catch (e) {
       toast.error(apiError(e));
     }
@@ -49,14 +49,14 @@ export function TelecallersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Telecallers</h1>
+        <h1 className="text-xl font-bold text-slate-800">Users</h1>
         <Button
           onClick={() => {
             setEditing(null);
             setModalOpen(true);
           }}
         >
-          <Plus size={16} /> Add telecaller
+          <Plus size={16} /> Add user
         </Button>
       </div>
 
@@ -74,7 +74,7 @@ export function TelecallersPage() {
         {isLoading ? (
           <Spinner />
         ) : !data?.data.length ? (
-          <EmptyState title="No telecallers yet" hint="Add your first telecaller to get started." />
+          <EmptyState title="No users yet" hint="Add your first user to get started." />
         ) : (
           <div className="divide-y divide-slate-100">
             {data.data.map((u) => (

@@ -481,7 +481,7 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
                 <p className="text-xs text-slate-700">{r.text}</p>
                 <p className="mt-0.5 text-[10px] text-slate-400">
                   {r.byName || 'Unknown'}
-                  {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'Telecaller'})` : ''} ·{' '}
+                  {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'User'})` : ''} ·{' '}
                   {fmtDateTime(r.createdAt)}
                 </p>
               </div>

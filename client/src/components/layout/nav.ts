@@ -18,7 +18,7 @@ export interface NavItem {
 export const NAV: Record<Role, NavItem[]> = {
   superadmin: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/telecallers', label: 'Telecallers', icon: Users },
+    { to: '/telecallers', label: 'Users', icon: Users },
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },

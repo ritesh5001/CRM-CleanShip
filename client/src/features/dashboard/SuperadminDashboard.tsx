@@ -32,7 +32,7 @@ export function SuperadminDashboard() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Telecallers"
+          label="Users"
           value={data.totalTelecallers}
           sub={`${data.activeTelecallers} active`}
           icon={<Users size={18} />}
@@ -63,7 +63,7 @@ export function SuperadminDashboard() {
         </Card>
 
         <Card className="p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-700">Calls today by telecaller</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">Calls today by user</h2>
           {data.perTelecaller.length === 0 ? (
             <p className="py-16 text-center text-sm text-slate-400">No calls logged today</p>
           ) : (
@@ -80,7 +80,7 @@ export function SuperadminDashboard() {
       </div>
 
       <Card className="p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Telecaller performance (today)</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-700">User performance (today)</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

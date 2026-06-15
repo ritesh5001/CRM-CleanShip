@@ -30,7 +30,7 @@ export function TaskFormModal({ open, onClose }: Props) {
   }
 
   async function handleSubmit() {
-    if (!form.assignedTo) return toast.error('Choose a telecaller');
+    if (!form.assignedTo) return toast.error('Choose a user');
     try {
       await create.mutateAsync({
         title: form.title,
