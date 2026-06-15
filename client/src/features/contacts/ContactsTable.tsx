@@ -1,10 +1,20 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, ChevronRight, ChevronDown, Send, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Phone,
+  MessageCircle,
+  ChevronRight,
+  ChevronDown,
+  Send,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
+import { Button } from '@/components/ui/Button';
 import { apiError } from '@/api/client';
 import { useLogCall } from '@/api/calls';
-import { useAddRemark, useScheduleFollowUp } from '@/api/leads';
+import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead } from '@/api/leads';
 import {
   CALL_STATUS_COLORS,
   CALL_STATUS_LABELS,
@@ -12,8 +22,9 @@ import {
   DISPOSITIONS,
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
+  PRIORITY_COLORS,
 } from '@/lib/constants';
-import { fmtDateTime, telLink, whatsappLink } from '@/lib/format';
+import { fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
 import type { CallStatus, Density, Disposition, Lead, Role, User } from '@/types';
 
 interface Props {
@@ -34,6 +45,7 @@ interface Props {
 }
 
 const NOT_DONE = '__not_done__';
+const PRIORITIES = ['low', 'medium', 'high'] as const;
 
 function location(l: Lead) {
   return [l.city, l.state, l.country].filter(Boolean).join(', ');
@@ -84,16 +96,15 @@ export function ContactsTable({
   const SortHeader = ({ field, label }: { field: string; label: string }) => (
     <button onClick={() => onSort(field)} className="flex items-center gap-1 hover:text-slate-700">
       {label}
-      {sortBy === field &&
-        (order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+      {sortBy === field && (order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
     </button>
   );
 
   return (
     <>
-      {/* Desktop grid */}
+      {/* Desktop grid (horizontally scrollable) */}
       <div className="hidden md:block">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[1400px] text-sm">
           <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
               {selectable && (
@@ -103,10 +114,17 @@ export function ContactsTable({
               )}
               <th className="w-6 px-2 py-2"></th>
               <th className="px-2 py-2"><SortHeader field="name" label="Name" /></th>
-              <th className="px-2 py-2"><SortHeader field="company" label="Company · Location" /></th>
+              <th className="px-2 py-2">Title</th>
+              <th className="px-2 py-2"><SortHeader field="company" label="Company" /></th>
+              <th className="px-2 py-2">Location</th>
               <th className="px-2 py-2">Phone</th>
+              <th className="px-2 py-2">Email</th>
+              <th className="px-2 py-2">Priority</th>
               {isAdmin && <th className="px-2 py-2"><SortHeader field="assignedAt" label="Assigned To" /></th>}
               <th className="px-2 py-2"><SortHeader field="callStatus" label="Outcome" /></th>
+              <th className="px-2 py-2"><SortHeader field="lastContactedAt" label="Last Contacted" /></th>
+              <th className="px-2 py-2">Follow-up</th>
+              <th className="px-2 py-2"><SortHeader field="createdAt" label="Added" /></th>
               <th className="min-w-[220px] px-2 py-2">Remark</th>
             </tr>
           </thead>
@@ -182,6 +200,32 @@ function AssignSelect({
   );
 }
 
+function PriorityCell({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
+  const update = useUpdateLead();
+  if (!isAdmin) {
+    return <Badge className={PRIORITY_COLORS[lead.priority]}>{lead.priority}</Badge>;
+  }
+  return (
+    <select
+      value={lead.priority}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) =>
+        update.mutate(
+          { id: lead._id, priority: e.target.value as Lead['priority'] },
+          { onError: (err) => toast.error(apiError(err)) }
+        )
+      }
+      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+    >
+      {PRIORITIES.map((p) => (
+        <option key={p} value={p}>
+          {p}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function OutcomeControl({
   lead,
   isAdmin,
@@ -238,14 +282,14 @@ function RemarkCell({ lead }: { lead: Lead }) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Add remark…"
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          className="w-full min-w-[160px] rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
         />
         <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
           <Send size={13} />
         </button>
       </div>
       {last && (
-        <p className="mt-0.5 truncate text-[11px] text-slate-400" title={last.text}>
+        <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-slate-400" title={last.text}>
           {lead.remarks!.length}× · {last.text}
         </p>
       )}
@@ -253,8 +297,9 @@ function RemarkCell({ lead }: { lead: Lead }) {
   );
 }
 
-function ExpandedDetail({ lead, role }: { lead: Lead; role: Role }) {
+function ExpandedDetail({ lead, role, isAdmin }: { lead: Lead; role: Role; isAdmin: boolean }) {
   const scheduleFollowUp = useScheduleFollowUp();
+  const del = useDeleteLead();
   const loc = location(lead);
 
   function onDate(v: string) {
@@ -264,14 +309,26 @@ function ExpandedDetail({ lead, role }: { lead: Lead; role: Role }) {
       { onSuccess: () => toast.success('Follow-up scheduled'), onError: (e) => toast.error(apiError(e)) }
     );
   }
+  function onDelete() {
+    if (!confirm(`Delete contact "${lead.name}"? This cannot be undone.`)) return;
+    del.mutate(lead._id, {
+      onSuccess: () => toast.success('Contact deleted'),
+      onError: (e) => toast.error(apiError(e)),
+    });
+  }
 
   return (
-    <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 lg:grid-cols-3">
       <div className="space-y-2 text-sm">
         {lead.email && <Detail label="Email" value={lead.email} />}
         {lead.altPhone && <Detail label="Alt phone" value={lead.altPhone} />}
         {loc && <Detail label="Location" value={loc} />}
+        {lead.source && <Detail label="Source" value={lead.source} />}
+        {!!lead.tags?.length && <Detail label="Tags" value={lead.tags.join(', ')} />}
+      </div>
+      <div className="space-y-2 text-sm">
         {lead.lastContactedAt && <Detail label="Last contacted" value={fmtDateTime(lead.lastContactedAt)} />}
+        <Detail label="Added" value={fmtDateTime(lead.createdAt)} />
         {role === 'telecaller' && (
           <div>
             <span className="text-xs text-slate-400">Schedule follow-up</span>
@@ -284,6 +341,11 @@ function ExpandedDetail({ lead, role }: { lead: Lead; role: Role }) {
               <p className="mt-1 text-[11px] text-slate-400">Next: {fmtDateTime(lead.nextFollowUpAt)}</p>
             )}
           </div>
+        )}
+        {isAdmin && (
+          <Button size="sm" variant="danger" onClick={onDelete}>
+            <Trash2 size={14} /> Delete contact
+          </Button>
         )}
       </div>
       <div>
@@ -313,7 +375,7 @@ function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-xs text-slate-400">{label}</span>
-      <p className="text-slate-700">{value}</p>
+      <p className="break-words text-slate-700">{value}</p>
     </div>
   );
 }
@@ -344,6 +406,7 @@ function Row({
   onOutcome: (lead: Lead, v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const muted = 'text-slate-500';
 
   return (
     <>
@@ -364,12 +427,10 @@ function Row({
             <Badge className={LEAD_STATUS_COLORS[lead.status]}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
             {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
           </div>
-          {lead.title && <p className="text-xs text-slate-400">{lead.title}</p>}
         </td>
-        <td className={`${pad} text-slate-500`}>
-          {lead.company || '—'}
-          {location(lead) ? <span className="text-slate-400"> · {location(lead)}</span> : ''}
-        </td>
+        <td className={`${pad} ${muted}`}>{lead.title || '—'}</td>
+        <td className={`${pad} ${muted}`}>{lead.company || '—'}</td>
+        <td className={`${pad} ${muted}`}>{location(lead) || '—'}</td>
         <td className={pad}>
           <div className="flex gap-1.5">
             <a href={telLink(lead.phone)} className="rounded p-1.5 text-brand-600 hover:bg-brand-50" title={lead.phone}>
@@ -379,6 +440,18 @@ function Row({
               <MessageCircle size={15} />
             </a>
           </div>
+        </td>
+        <td className={`${pad} ${muted}`}>
+          {lead.email ? (
+            <a href={`mailto:${lead.email}`} className="hover:text-brand-600" onClick={(e) => e.stopPropagation()}>
+              {lead.email}
+            </a>
+          ) : (
+            '—'
+          )}
+        </td>
+        <td className={pad}>
+          <PriorityCell lead={lead} isAdmin={isAdmin} />
         </td>
         {isAdmin && (
           <td className={pad}>
@@ -392,6 +465,9 @@ function Row({
         <td className={pad}>
           <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />
         </td>
+        <td className={`${pad} ${muted}`}>{lead.lastContactedAt ? fmtDate(lead.lastContactedAt) : '—'}</td>
+        <td className={`${pad} ${muted}`}>{lead.nextFollowUpAt ? fmtDate(lead.nextFollowUpAt) : '—'}</td>
+        <td className={`${pad} ${muted}`}>{fmtDate(lead.createdAt)}</td>
         <td className={pad}>
           <RemarkCell lead={lead} />
         </td>
@@ -399,7 +475,7 @@ function Row({
       {open && (
         <tr>
           <td colSpan={99} className="p-0">
-            <ExpandedDetail lead={lead} role={role} />
+            <ExpandedDetail lead={lead} role={role} isAdmin={isAdmin} />
           </td>
         </tr>
       )}
@@ -467,7 +543,7 @@ function MobileCard({
       </div>
       {open && (
         <div className="mt-2 overflow-hidden rounded-lg">
-          <ExpandedDetail lead={lead} role={role} />
+          <ExpandedDetail lead={lead} role={role} isAdmin={isAdmin} />
         </div>
       )}
     </div>
