@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   Phone,
   MessageCircle,
@@ -26,7 +26,27 @@ import {
   PRIORITY_COLORS,
 } from '@/lib/constants';
 import { cleanPhone, fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
+import { useUiStore } from '@/store/ui';
 import type { CallStatus, Density, Disposition, Lead, Role, User } from '@/types';
+
+const DEFAULT_WIDTHS: Record<string, number> = {
+  select: 36,
+  expand: 32,
+  name: 210,
+  title: 150,
+  company: 150,
+  location: 170,
+  phone: 130,
+  altphone: 130,
+  email: 210,
+  priority: 100,
+  assigned: 150,
+  outcome: 150,
+  lastContacted: 120,
+  followup: 200,
+  added: 110,
+  remark: 240,
+};
 
 interface Props {
   leads: Lead[];
@@ -74,7 +94,7 @@ function FollowUpCell({ lead }: { lead: Lead }) {
             { onSuccess: () => toast.success('Follow-up scheduled'), onError: (err) => toast.error(apiError(err)) }
           )
         }
-        className="w-[168px] rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+        className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
       />
       {lead.nextFollowUpAt && (
         <p className="text-[11px] text-slate-400">Next: {fmtDate(lead.nextFollowUpAt)}</p>
@@ -136,6 +156,61 @@ export function ContactsTable({
   const logCall = useLogCall();
   const pad = density === 'compact' ? 'px-2 py-1' : 'px-2 py-2.5';
 
+  // Resizable columns (widths persisted in the UI store).
+  const storedWidths = useUiStore((s) => s.colWidths);
+  const setColWidths = useUiStore((s) => s.setColWidths);
+  const [widths, setWidths] = useState<Record<string, number>>({ ...DEFAULT_WIDTHS, ...storedWidths });
+  const widthsRef = useRef(widths);
+  widthsRef.current = widths;
+
+  const colIds = [
+    ...(selectable ? ['select'] : []),
+    'expand',
+    'name',
+    'title',
+    'company',
+    'location',
+    'phone',
+    'altphone',
+    'email',
+    'priority',
+    ...(isAdmin ? ['assigned'] : []),
+    'outcome',
+    'lastContacted',
+    'followup',
+    'added',
+    'remark',
+  ];
+  const widthOf = (id: string) => widths[id] ?? DEFAULT_WIDTHS[id] ?? 120;
+  const totalWidth = colIds.reduce((s, id) => s + widthOf(id), 0);
+
+  function startResize(id: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = widthOf(id);
+    const move = (ev: MouseEvent) => setWidths((p) => ({ ...p, [id]: Math.max(60, startW + ev.clientX - startX) }));
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      setColWidths(widthsRef.current);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  const Th = ({ id, children, resizable = true }: { id: string; children?: ReactNode; resizable?: boolean }) => (
+    <th className="relative select-none px-2 py-2">
+      {children}
+      {resizable && (
+        <span
+          onMouseDown={(e) => startResize(id, e)}
+          className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize hover:bg-brand-300"
+        />
+      )}
+    </th>
+  );
+
   function handleOutcome(lead: Lead, value: string) {
     if (!value) return;
     const vars =
@@ -162,31 +237,36 @@ export function ContactsTable({
 
   return (
     <>
-      {/* Desktop grid (horizontally scrollable) */}
+      {/* Desktop grid (horizontally scrollable, resizable columns) */}
       <div className="hidden md:block">
-        <table className="w-full min-w-[1650px] text-sm">
+        <table className="text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
+          <colgroup>
+            {colIds.map((id) => (
+              <col key={id} style={{ width: widthOf(id) }} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
               {selectable && (
-                <th className="px-2 py-2">
+                <Th id="select" resizable={false}>
                   <input type="checkbox" className="h-4 w-4" checked={!!allChecked} onChange={onToggleAll} />
-                </th>
+                </Th>
               )}
-              <th className="w-6 px-2 py-2"></th>
-              <th className="px-2 py-2"><SortHeader field="name" label="Name" /></th>
-              <th className="px-2 py-2">Title</th>
-              <th className="px-2 py-2"><SortHeader field="company" label="Company" /></th>
-              <th className="px-2 py-2"><SortHeader field="country" label="Location" /></th>
-              <th className="px-2 py-2">Phone</th>
-              <th className="px-2 py-2">Alt Phone</th>
-              <th className="px-2 py-2">Email</th>
-              <th className="px-2 py-2">Priority</th>
-              {isAdmin && <th className="px-2 py-2"><SortHeader field="assignedAt" label="Assigned To" /></th>}
-              <th className="px-2 py-2"><SortHeader field="callStatus" label="Outcome" /></th>
-              <th className="px-2 py-2"><SortHeader field="lastContactedAt" label="Last Contacted" /></th>
-              <th className="px-2 py-2">Follow-up</th>
-              <th className="px-2 py-2"><SortHeader field="createdAt" label="Added" /></th>
-              <th className="min-w-[220px] px-2 py-2">Remark</th>
+              <Th id="expand" resizable={false} />
+              <Th id="name"><SortHeader field="name" label="Name" /></Th>
+              <Th id="title">Title</Th>
+              <Th id="company"><SortHeader field="company" label="Company" /></Th>
+              <Th id="location"><SortHeader field="country" label="Location" /></Th>
+              <Th id="phone">Phone</Th>
+              <Th id="altphone">Alt Phone</Th>
+              <Th id="email">Email</Th>
+              <Th id="priority">Priority</Th>
+              {isAdmin && <Th id="assigned"><SortHeader field="assignedAt" label="Assigned To" /></Th>}
+              <Th id="outcome"><SortHeader field="callStatus" label="Outcome" /></Th>
+              <Th id="lastContacted"><SortHeader field="lastContactedAt" label="Last Contacted" /></Th>
+              <Th id="followup">Follow-up</Th>
+              <Th id="added"><SortHeader field="createdAt" label="Added" /></Th>
+              <Th id="remark">Remark</Th>
             </tr>
           </thead>
           <tbody>
@@ -249,7 +329,7 @@ function AssignSelect({
         const t = telecallers.find((x) => x._id === e.target.value);
         if (t) onAssign?.(lead._id, t._id, t.name);
       }}
-      className="max-w-[150px] rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
     >
       <option value="">Assign…</option>
       {telecallers.map((t) => (
@@ -310,7 +390,7 @@ function OutcomeControl({
       value={outcomeValue(lead)}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => onOutcome(lead, e.target.value)}
-      className="max-w-[150px] rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
     >
       <option value="">— Outcome —</option>
       {DISPOSITIONS.map((d) => (
@@ -343,7 +423,7 @@ function RemarkCell({ lead }: { lead: Lead }) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Add remark…"
-          className="w-full min-w-[160px] rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
         />
         <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
           <Send size={13} />
@@ -463,15 +543,21 @@ function Row({
           </button>
         </td>
         <td className={pad}>
-          <div className="flex items-center gap-2">
-            <p className="font-medium text-slate-800">{lead.name}</p>
-            <Badge className={LEAD_STATUS_COLORS[lead.status]}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
-            {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate font-medium text-slate-800" title={lead.name}>{lead.name}</p>
+            <Badge className={`shrink-0 ${LEAD_STATUS_COLORS[lead.status]}`}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
+            {lead.qualified && <Badge className="shrink-0 bg-green-600 text-white">Lead</Badge>}
           </div>
         </td>
-        <td className={`${pad} ${muted}`}>{lead.title || '—'}</td>
-        <td className={`${pad} ${muted}`}>{lead.company || '—'}</td>
-        <td className={`${pad} ${muted}`}>{location(lead) || '—'}</td>
+        <td className={`${pad} ${muted}`}>
+          <span className="block truncate" title={lead.title}>{lead.title || '—'}</span>
+        </td>
+        <td className={`${pad} ${muted}`}>
+          <span className="block truncate" title={lead.company}>{lead.company || '—'}</span>
+        </td>
+        <td className={`${pad} ${muted}`}>
+          <span className="block truncate" title={location(lead)}>{location(lead) || '—'}</span>
+        </td>
         <td className={pad}>
           <PhoneActions phone={lead.phone} />
         </td>
@@ -480,7 +566,12 @@ function Row({
         </td>
         <td className={`${pad} ${muted}`}>
           {lead.email ? (
-            <a href={`mailto:${lead.email}`} className="hover:text-brand-600" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={`mailto:${lead.email}`}
+              title={lead.email}
+              className="block truncate hover:text-brand-600"
+              onClick={(e) => e.stopPropagation()}
+            >
               {lead.email}
             </a>
           ) : (
