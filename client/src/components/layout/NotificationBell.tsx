@@ -1,0 +1,75 @@
+import { useState } from 'react';
+import { Bell, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  useNotifications,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+} from '@/api/notifications';
+import { fmtRelative } from '@/lib/format';
+
+export function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const { data } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  const navigate = useNavigate();
+
+  const unread = data?.unreadCount ?? 0;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+        aria-label="Notifications"
+      >
+        <Bell size={20} />
+        {unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-2 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+              <span className="text-sm font-semibold">Notifications</span>
+              {unread > 0 && (
+                <button
+                  onClick={() => markAll.mutate()}
+                  className="flex items-center gap-1 text-xs text-brand-600 hover:underline"
+                >
+                  <Check size={12} /> Mark all read
+                </button>
+              )}
+            </div>
+            {!data?.data.length && (
+              <p className="p-6 text-center text-sm text-slate-400">No notifications</p>
+            )}
+            {data?.data.map((n) => (
+              <button
+                key={n._id}
+                onClick={() => {
+                  markRead.mutate(n._id);
+                  if (n.link) navigate(n.link);
+                  setOpen(false);
+                }}
+                className={`block w-full border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 ${
+                  n.isRead ? '' : 'bg-brand-50/40'
+                }`}
+              >
+                <p className="text-sm font-medium text-slate-700">{n.title}</p>
+                {n.message && <p className="text-xs text-slate-500">{n.message}</p>}
+                <p className="mt-0.5 text-[11px] text-slate-400">{fmtRelative(n.createdAt)}</p>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

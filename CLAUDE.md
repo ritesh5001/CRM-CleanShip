@@ -1,0 +1,117 @@
+# CLAUDE.md — CleanShip CRM
+
+Guidance for working in this repository.
+
+## What this project is
+
+CleanShip CRM is a **telecaller management CRM**. Its purpose is to let a **Superadmin** control and
+coordinate telecallers: create their accounts (and set each telecaller's name & daily call target),
+assign them leads and tasks, and monitor what they're doing and the call outcomes they report.
+**Telecallers** log in, see their assigned leads/tasks/follow-ups, place calls (click-to-call),
+record dispositions, and update task status.
+
+## Architecture
+
+Monorepo with two independent packages, orchestrated by the root `package.json`:
+
+- **`server/`** — Express + TypeScript REST API (MongoDB via Mongoose). ESM (`"type"` via NodeNext).
+- **`client/`** — React + TypeScript SPA (Vite + Tailwind). Mobile + desktop responsive.
+
+The client dev server proxies `/api` to the API. API base path is `/api/v1`.
+
+### Ports
+- API: **5050** (avoid 5000 — macOS AirPlay Receiver uses it).
+- Client: **5173**.
+
+## Roles & permissions
+
+Two roles (`superadmin`, `telecaller`):
+
+- **Superadmin:** manage telecallers; create/import/assign leads; create/assign/delete tasks; view
+  all data; dashboard analytics. No public signup — superadmin creates telecallers.
+- **Telecaller:** sees only their own leads/tasks/follow-ups; logs calls; updates task status;
+  marks follow-ups done; personal stats.
+
+Enforced by `authenticate` (JWT) + `requireRole(...)` middleware, plus per-document ownership checks
+in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
+
+## Data models (`server/src/models`)
+
+- **User** — `name, email, phone, passwordHash, role, isActive, dailyTarget, createdBy, lastLoginAt`.
+  Methods: `setPassword`, `comparePassword` (bcrypt). `passwordHash` is `select:false`.
+- **Lead** — `name, phone, altPhone, email, company, city, source, tags, status, priority,
+  assignedTo, assignedAt, lastContactedAt, nextFollowUpAt, notes, createdBy, importBatch`.
+  Statuses: new, assigned, in_progress, interested, callback, not_interested, converted, dnd.
+- **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
+  dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
+- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt`.
+  `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
+- **FollowUp** — `lead, telecaller, scheduledAt, status(pending|done|missed), notes, callLog`.
+- **Notification** — `recipient, type, title, message, link, isRead`.
+- **ImportBatch** — `fileName, uploadedBy, totalRows, successCount, errorCount, errors[]`.
+
+## API surface (`/api/v1`)
+
+- **Auth:** `POST /auth/login`, `GET /auth/me`, `PUT /auth/change-password`, `POST /auth/logout`.
+- **Users (superadmin):** `GET/POST /users`, `GET/PUT/DELETE /users/:id`,
+  `PATCH /users/:id/status|target|reset-password`.
+- **Leads:** `GET /leads`, `POST /leads`, `GET/PUT/DELETE /leads/:id`, `POST /leads/import`,
+  `PATCH /leads/bulk-assign`, `PATCH /leads/:id/assign`. (Writes/import/assign are superadmin-only;
+  telecallers get a scoped `GET`/`PUT`.)
+- **Tasks:** `GET /tasks`, `POST /tasks` (admin), `GET /tasks/:id`, `PUT /tasks/:id` (admin),
+  `PATCH /tasks/:id/status`, `DELETE /tasks/:id` (admin).
+- **Calls:** `GET /calls`, `POST /calls` (logs disposition → updates lead, creates follow-up).
+- **Follow-ups:** `GET /followups?scope=today|upcoming|overdue|all`, `PATCH /followups/:id/done`.
+- **Notifications:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`.
+- **Reports:** `GET /reports/overview` (admin), `GET /reports/me` (telecaller).
+
+Response shapes: success → `{ success: true, ... }`; lists → `{ success, data, pagination }`;
+errors → `{ success: false, message, details? }` via the central `errorHandler`.
+
+## Server conventions
+
+- Controllers wrap async logic in `asyncHandler` and throw `ApiError.*(...)` for failures.
+- Request validation via zod schemas in `validators/` applied with the `validate(schema, source)`
+  middleware (replaces `req.body`/merges query).
+- Use `idOf(ref)` (`utils/idOf.ts`) when comparing a Mongoose ref that may be populated or raw.
+- Notifications are emitted via `services/notificationService.ts` (`notify({...})`).
+- Lead import logic lives in `services/importService.ts` (xlsx + header normalization).
+- New resource = model → validators → controller → routes → register in `routes/index.ts`.
+
+## Client conventions
+
+- Server state via **TanStack Query** hooks in `src/api/*` (one file per resource). Mutations
+  invalidate the relevant query keys.
+- Auth/token in **Zustand** (`store/auth.ts`, persisted to localStorage). Axios instance
+  (`api/client.ts`) injects the bearer token and logs out on 401.
+- Routing in `routes/router.tsx`; guards `ProtectedRoute` / `RoleRoute` in `routes/guards.tsx`.
+- Role-aware pages (`pages/*`) branch on `useAuthStore().user.role`; the dashboard renders
+  `SuperadminDashboard` or `TelecallerDashboard`.
+- Reusable UI in `components/ui/` (Button, Field, Modal, Misc). Feature modals in `features/*`.
+- Formatting/click-to-call helpers in `lib/format.ts`; label/color maps in `lib/constants.ts`.
+- `@/` is aliased to `client/src/`.
+
+## Commands
+
+```bash
+npm run install:all   # install all deps
+npm run seed          # seed superadmin + demo data
+npm run dev           # API (:5050) + client (:5173)
+npm run build         # build both
+npm run typecheck     # tsc --noEmit in both packages
+```
+
+Seeded logins: `admin@cleanship.com / Admin@12345`, `telecaller@cleanship.com / Tele@12345`.
+
+## Environment (`server/.env`)
+
+`PORT`, `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CLIENT_ORIGIN`, and
+`SUPERADMIN_NAME/EMAIL/PASSWORD` (seed). See `server/.env.example`.
+
+## Notes for future work
+
+- Telephony is intentionally manual (tel:/WhatsApp links). A provider (Twilio/Exotel) could be added
+  behind `callController` later.
+- `xlsx` has an unpatched npm ReDoS advisory; import is superadmin-only. Consider the SheetJS CDN
+  build if hardening is needed.
+- Notifications poll every 30s; could move to WebSockets/SSE for realtime.
