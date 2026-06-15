@@ -72,9 +72,22 @@ Open http://localhost:5173.
 
 ## CSV/Excel import format
 
-Recognized column headers (case/space-insensitive): `name`, `phone` (required), `altPhone`, `email`,
-`company`, `city`, `source`, `notes`. Rows missing a phone are reported as errors; fully empty rows
-are skipped.
+Header matching is case/space/punctuation-insensitive and understands common CRM **and Apollo.io
+export** columns:
+
+| Lead field | Recognized headers |
+| ---------- | ------------------ |
+| name       | `Name` / `Full Name`, or `First Name` + `Last Name` |
+| phone\*    | `Phone`, `Mobile Phone`, `Work Direct Phone`, `Corporate Phone`, `Other/Home Phone` (first present wins; a second distinct number becomes `altPhone`) |
+| email      | `Email` (only kept if it's a valid address — Apollo's "User Managed"/"Unavailable" are dropped) |
+| title      | `Title` / `Job Title` / `Designation` |
+| company    | `Company` / `Company Name` / `Organization` |
+| city/state/country | `City`, `State`/`Province`, `Country` |
+| tags       | `Industry` |
+| source / notes | `Source` / `Lead Source`, `Notes` / `Remarks` |
+
+\*Phone is required. Phone cells with Excel's leading `'` text-prefix are cleaned automatically. Rows
+missing a phone are reported as errors; fully empty rows are skipped silently.
 
 ## Project structure
 

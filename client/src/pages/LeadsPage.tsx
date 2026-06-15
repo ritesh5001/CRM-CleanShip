@@ -130,8 +130,11 @@ export function LeadsPage() {
                     </div>
                     <p className="text-sm text-slate-500">
                       {lead.phone}
+                      {lead.title ? ` · ${lead.title}` : ''}
                       {lead.company ? ` · ${lead.company}` : ''}
-                      {lead.city ? ` · ${lead.city}` : ''}
+                      {[lead.city, lead.state, lead.country].filter(Boolean).length
+                        ? ` · ${[lead.city, lead.state, lead.country].filter(Boolean).join(', ')}`
+                        : ''}
                     </p>
                     <p className="text-xs text-slate-400">
                       {isAdmin

@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 
+// Defaults to the Vite dev proxy (`/api/v1`). Set VITE_API_URL to point at a
+// deployed API, e.g. https://api.example.com/api/v1.
 export const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_URL ?? '/api/v1',
 });
 
 // Attach JWT to every request.

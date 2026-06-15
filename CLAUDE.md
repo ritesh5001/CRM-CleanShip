@@ -39,8 +39,9 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 
 - **User** — `name, email, phone, passwordHash, role, isActive, dailyTarget, createdBy, lastLoginAt`.
   Methods: `setPassword`, `comparePassword` (bcrypt). `passwordHash` is `select:false`.
-- **Lead** — `name, phone, altPhone, email, company, city, source, tags, status, priority,
-  assignedTo, assignedAt, lastContactedAt, nextFollowUpAt, notes, createdBy, importBatch`.
+- **Lead** — `name, phone, altPhone, email, title, company, city, state, country, source, tags,
+  status, priority, assignedTo, assignedAt, lastContactedAt, nextFollowUpAt, notes, createdBy,
+  importBatch`.
   Statuses: new, assigned, in_progress, interested, callback, not_interested, converted, dnd.
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
@@ -75,7 +76,8 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
   middleware (replaces `req.body`/merges query).
 - Use `idOf(ref)` (`utils/idOf.ts`) when comparing a Mongoose ref that may be populated or raw.
 - Notifications are emitted via `services/notificationService.ts` (`notify({...})`).
-- Lead import logic lives in `services/importService.ts` (xlsx + header normalization).
+- Lead import logic lives in `services/importService.ts` (xlsx + header normalization; handles CRM
+  and Apollo.io export columns — first/last name, multiple phone columns, apostrophe-cleaning).
 - New resource = model → validators → controller → routes → register in `routes/index.ts`.
 
 ## Client conventions

@@ -29,8 +29,11 @@ export interface Lead {
   phone: string;
   altPhone?: string;
   email?: string;
+  title?: string;
   company?: string;
   city?: string;
+  state?: string;
+  country?: string;
   source?: string;
   tags?: string[];
   status: LeadStatus;
