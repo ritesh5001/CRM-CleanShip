@@ -84,8 +84,12 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           <h1 className="text-xl font-bold text-slate-800">{title}</h1>
           <p className="text-sm text-slate-400">
             {isContacts
-              ? 'All uploaded contacts. Assign them to telecallers to start calling.'
-              : 'Interested contacts that converted into leads.'}
+              ? isAdmin
+                ? 'All uploaded contacts. Assign them to telecallers to start calling.'
+                : 'Contacts assigned to you. Call them and log the outcome.'
+              : isAdmin
+                ? 'Interested contacts that converted into leads.'
+                : 'Your contacts that turned into interested leads.'}
           </p>
         </div>
         {selectable && (
@@ -196,16 +200,20 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         </div>
       )}
 
-      <LeadFormModal open={formOpen} onClose={() => setFormOpen(false)} />
-      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
-      <AssignModal
-        open={!!assignIds}
-        leadIds={assignIds ?? []}
-        onClose={() => {
-          setAssignIds(null);
-          setSelected([]);
-        }}
-      />
+      {isAdmin && (
+        <>
+          <LeadFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+          <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+          <AssignModal
+            open={!!assignIds}
+            leadIds={assignIds ?? []}
+            onClose={() => {
+              setAssignIds(null);
+              setSelected([]);
+            }}
+          />
+        </>
+      )}
       <ContactDrawer lead={openLead} role={role} onClose={() => setOpenLead(null)} />
     </div>
   );

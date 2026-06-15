@@ -119,7 +119,7 @@ export function TasksPage() {
         )}
       </Card>
 
-      <TaskFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+      {isAdmin && <TaskFormModal open={formOpen} onClose={() => setFormOpen(false)} />}
     </div>
   );
 }

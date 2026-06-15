@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function AssignModal({ open, onClose, leadIds }: Props) {
-  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 });
+  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: open });
   const assign = useAssignLead();
   const bulkAssign = useBulkAssignLeads();
   const [assignedTo, setAssignedTo] = useState('');

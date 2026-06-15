@@ -15,7 +15,7 @@ interface Props {
 
 export function ImportModal({ open, onClose }: Props) {
   const importLeads = useImportLeads();
-  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 });
+  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: open });
   const [file, setFile] = useState<File | null>(null);
   const [assignedTo, setAssignedTo] = useState('');
   const [result, setResult] = useState<{ totalRows: number; successCount: number; errorCount: number } | null>(

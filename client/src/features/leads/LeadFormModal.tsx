@@ -14,7 +14,7 @@ interface Props {
 
 export function LeadFormModal({ open, onClose }: Props) {
   const create = useCreateLead();
-  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 });
+  const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: open });
 
   const [form, setForm] = useState({
     name: '',
