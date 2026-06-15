@@ -20,9 +20,16 @@ export function isOverdue(d?: string | Date | null) {
   return isPast(new Date(d)) && !isToday(new Date(d));
 }
 
+/** Normalizes a phone to a clean dial-able form, preserving the leading +country code. */
+export function cleanPhone(phone: string) {
+  const trimmed = phone.trim().replace(/[^\d+]/g, '');
+  // Keep only a single leading '+'.
+  return trimmed.startsWith('+') ? `+${trimmed.slice(1).replace(/\+/g, '')}` : trimmed.replace(/\+/g, '');
+}
+
 /** Builds a click-to-call (tel:) link. */
 export function telLink(phone: string) {
-  return `tel:${phone.replace(/[^\d+]/g, '')}`;
+  return `tel:${cleanPhone(phone)}`;
 }
 
 /** Builds a WhatsApp deep link. */

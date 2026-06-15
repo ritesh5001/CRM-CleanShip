@@ -8,6 +8,7 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
+  Copy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
@@ -24,7 +25,7 @@ import {
   LEAD_STATUS_LABELS,
   PRIORITY_COLORS,
 } from '@/lib/constants';
-import { fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
+import { cleanPhone, fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
 import type { CallStatus, Density, Disposition, Lead, Role, User } from '@/types';
 
 interface Props {
@@ -49,6 +50,42 @@ const PRIORITIES = ['low', 'medium', 'high'] as const;
 
 function location(l: Lead) {
   return [l.city, l.state, l.country].filter(Boolean).join(', ');
+}
+
+function copyPhone(phone: string) {
+  const num = cleanPhone(phone);
+  navigator.clipboard
+    .writeText(num)
+    .then(() => toast.success(`Copied ${num}`))
+    .catch(() => toast.error('Copy failed'));
+}
+
+/** Copy (left) · Call · WhatsApp actions for a phone number. */
+function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
+  const size = big ? 16 : 15;
+  const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
+  return (
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => copyPhone(phone)}
+        title="Copy number"
+        className={`${cls} text-slate-500 hover:bg-slate-100`}
+      >
+        <Copy size={size} />
+      </button>
+      <a href={telLink(phone)} title={phone} className={`${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`}>
+        <Phone size={size} />
+      </a>
+      <a
+        href={whatsappLink(phone)}
+        target="_blank"
+        rel="noreferrer"
+        className={`${cls} text-emerald-600 hover:bg-emerald-50 ${big ? 'bg-emerald-50' : ''}`}
+      >
+        <MessageCircle size={size} />
+      </a>
+    </div>
+  );
 }
 function outcomeValue(l: Lead) {
   if (l.callStatus === 'done') return l.lastOutcome ?? '';
@@ -432,14 +469,7 @@ function Row({
         <td className={`${pad} ${muted}`}>{lead.company || '—'}</td>
         <td className={`${pad} ${muted}`}>{location(lead) || '—'}</td>
         <td className={pad}>
-          <div className="flex gap-1.5">
-            <a href={telLink(lead.phone)} className="rounded p-1.5 text-brand-600 hover:bg-brand-50" title={lead.phone}>
-              <Phone size={15} />
-            </a>
-            <a href={whatsappLink(lead.phone)} target="_blank" rel="noreferrer" className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50">
-              <MessageCircle size={15} />
-            </a>
-          </div>
+          <PhoneActions phone={lead.phone} />
         </td>
         <td className={`${pad} ${muted}`}>
           {lead.email ? (
@@ -524,12 +554,7 @@ function MobileCard({
             {lead.company ? ` · ${lead.company}` : ''}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <a href={telLink(lead.phone)} className="rounded-lg bg-brand-50 p-2 text-brand-600">
-              <Phone size={16} />
-            </a>
-            <a href={whatsappLink(lead.phone)} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
-              <MessageCircle size={16} />
-            </a>
+            <PhoneActions phone={lead.phone} big />
             {isAdmin && onAssign && <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />}
             {!isAdmin && <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />}
             <button onClick={() => setOpen((o) => !o)} className="ml-auto text-slate-400">
