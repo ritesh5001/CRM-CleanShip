@@ -9,7 +9,9 @@ import { importLeads } from '../services/importService.js';
 import { notify } from '../services/notificationService.js';
 import { idOf } from '../utils/idOf.js';
 
-function buildFilter(req: Request): Record<string, unknown> {
+// Builds the Mongo filter from query params. `includeCallStatus=false` is used by
+// the stats endpoint so chip counts reflect every callStatus within the same scope.
+function buildFilter(req: Request, includeCallStatus = true): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
 
   // Telecallers only ever see their own leads.
@@ -21,7 +23,8 @@ function buildFilter(req: Request): Record<string, unknown> {
 
   if (typeof req.query.status === 'string' && req.query.status) filter.status = req.query.status;
   if (typeof req.query.priority === 'string' && req.query.priority) filter.priority = req.query.priority;
-  if (typeof req.query.callStatus === 'string' && req.query.callStatus) filter.callStatus = req.query.callStatus;
+  if (includeCallStatus && typeof req.query.callStatus === 'string' && req.query.callStatus)
+    filter.callStatus = req.query.callStatus;
   // Leads tab passes qualified=true; Contacts tab omits it (shows everything).
   if (req.query.qualified === 'true') filter.qualified = true;
   else if (req.query.qualified === 'false') filter.qualified = false;
@@ -33,6 +36,23 @@ function buildFilter(req: Request): Record<string, unknown> {
   return filter;
 }
 
+const SORTABLE = new Set([
+  'name',
+  'company',
+  'status',
+  'callStatus',
+  'lastContactedAt',
+  'assignedAt',
+  'createdAt',
+  'qualified',
+]);
+
+function buildSort(req: Request): Record<string, 1 | -1> {
+  const by = typeof req.query.sortBy === 'string' && SORTABLE.has(req.query.sortBy) ? req.query.sortBy : 'createdAt';
+  const order: 1 | -1 = req.query.order === 'asc' ? 1 : -1;
+  return { [by]: order };
+}
+
 export const listLeads = asyncHandler(async (req: Request, res: Response) => {
   const pg = getPagination(req.query);
   const filter = buildFilter(req);
@@ -40,13 +60,39 @@ export const listLeads = asyncHandler(async (req: Request, res: Response) => {
   const [leads, total] = await Promise.all([
     Lead.find(filter)
       .populate('assignedTo', 'name email')
-      .sort({ createdAt: -1 })
+      .collation({ locale: 'en', strength: 2 }) // case-insensitive sort for name/company
+      .sort(buildSort(req))
       .skip(pg.skip)
       .limit(pg.limit),
     Lead.countDocuments(filter),
   ]);
 
   res.json({ success: true, ...paginated(leads, total, pg) });
+});
+
+// GET /leads/stats — counts for the clickable stat chips (scope minus callStatus).
+export const getLeadStats = asyncHandler(async (req: Request, res: Response) => {
+  const base = buildFilter(req, false);
+  const [total, notCalled, done, notDone, leads] = await Promise.all([
+    Lead.countDocuments(base),
+    Lead.countDocuments({ ...base, callStatus: 'pending' }),
+    Lead.countDocuments({ ...base, callStatus: 'done' }),
+    Lead.countDocuments({ ...base, callStatus: 'not_done' }),
+    Lead.countDocuments({ ...base, qualified: true }),
+  ]);
+  res.json({ success: true, stats: { total, notCalled, done, notDone, leads } });
+});
+
+// GET /leads/export — all matching rows (capped) for client-side CSV.
+export const exportLeads = asyncHandler(async (req: Request, res: Response) => {
+  const filter = buildFilter(req);
+  const leads = await Lead.find(filter)
+    .populate('assignedTo', 'name')
+    .collation({ locale: 'en', strength: 2 })
+    .sort(buildSort(req))
+    .limit(10000)
+    .lean();
+  res.json({ success: true, data: leads });
 });
 
 export const getLead = asyncHandler(async (req: Request, res: Response) => {

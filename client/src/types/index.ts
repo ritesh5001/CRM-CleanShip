@@ -1,5 +1,7 @@
 export type Role = 'superadmin' | 'telecaller';
 
+export type Density = 'comfortable' | 'compact';
+
 export interface User {
   _id: string;
   id?: string;

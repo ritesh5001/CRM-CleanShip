@@ -18,6 +18,8 @@ router.use(authenticate);
 
 // Reads — both roles (telecaller results are scoped to their own leads in the controller).
 router.get('/', ctrl.listLeads);
+router.get('/stats', ctrl.getLeadStats);
+router.get('/export', ctrl.exportLeads);
 
 // Superadmin-only writes / assignment / import.
 router.post('/', requireRole('superadmin'), validate(createLeadSchema), ctrl.createLead);

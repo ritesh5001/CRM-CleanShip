@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, ChevronRight, ChevronDown, Send } from 'lucide-react';
+import { Phone, MessageCircle, ChevronRight, ChevronDown, Send, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
 import { apiError } from '@/api/client';
@@ -14,18 +14,22 @@ import {
   LEAD_STATUS_LABELS,
 } from '@/lib/constants';
 import { fmtDateTime, telLink, whatsappLink } from '@/lib/format';
-import type { CallStatus, Disposition, Lead, Role, User } from '@/types';
+import type { CallStatus, Density, Disposition, Lead, Role, User } from '@/types';
 
 interface Props {
   leads: Lead[];
   isLoading: boolean;
   role: Role;
+  density: Density;
   selectable?: boolean;
   selected: string[];
   onToggle: (id: string) => void;
   onToggleAll: () => void;
   telecallers?: User[];
   onAssign?: (leadId: string, telecallerId: string, name: string) => void;
+  sortBy: string;
+  order: 'asc' | 'desc';
+  onSort: (field: string) => void;
   emptyHint?: string;
 }
 
@@ -34,7 +38,6 @@ const NOT_DONE = '__not_done__';
 function location(l: Lead) {
   return [l.city, l.state, l.country].filter(Boolean).join(', ');
 }
-
 function outcomeValue(l: Lead) {
   if (l.callStatus === 'done') return l.lastOutcome ?? '';
   if (l.callStatus === 'not_done') return NOT_DONE;
@@ -45,16 +48,21 @@ export function ContactsTable({
   leads,
   isLoading,
   role,
+  density,
   selectable,
   selected,
   onToggle,
   onToggleAll,
   telecallers = [],
   onAssign,
+  sortBy,
+  order,
+  onSort,
   emptyHint,
 }: Props) {
   const isAdmin = role === 'superadmin';
   const logCall = useLogCall();
+  const pad = density === 'compact' ? 'px-2 py-1' : 'px-2 py-2.5';
 
   function handleOutcome(lead: Lead, value: string) {
     if (!value) return;
@@ -73,25 +81,33 @@ export function ContactsTable({
 
   const allChecked = selectable && leads.every((l) => selected.includes(l._id));
 
+  const SortHeader = ({ field, label }: { field: string; label: string }) => (
+    <button onClick={() => onSort(field)} className="flex items-center gap-1 hover:text-slate-700">
+      {label}
+      {sortBy === field &&
+        (order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+    </button>
+  );
+
   return (
     <>
       {/* Desktop grid */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden md:block">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+          <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
+            <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
               {selectable && (
-                <th className="p-2">
+                <th className="px-2 py-2">
                   <input type="checkbox" className="h-4 w-4" checked={!!allChecked} onChange={onToggleAll} />
                 </th>
               )}
-              <th className="w-6 p-2"></th>
-              <th className="p-2">Name</th>
-              <th className="p-2">Company · Location</th>
-              <th className="p-2">Phone</th>
-              {isAdmin && <th className="p-2">Assigned To</th>}
-              <th className="p-2">Outcome</th>
-              <th className="p-2 min-w-[220px]">Remark</th>
+              <th className="w-6 px-2 py-2"></th>
+              <th className="px-2 py-2"><SortHeader field="name" label="Name" /></th>
+              <th className="px-2 py-2"><SortHeader field="company" label="Company · Location" /></th>
+              <th className="px-2 py-2">Phone</th>
+              {isAdmin && <th className="px-2 py-2"><SortHeader field="assignedAt" label="Assigned To" /></th>}
+              <th className="px-2 py-2"><SortHeader field="callStatus" label="Outcome" /></th>
+              <th className="min-w-[220px] px-2 py-2">Remark</th>
             </tr>
           </thead>
           <tbody>
@@ -101,6 +117,7 @@ export function ContactsTable({
                 lead={lead}
                 isAdmin={isAdmin}
                 role={role}
+                pad={pad}
                 selectable={selectable}
                 selected={selected.includes(lead._id)}
                 onToggle={onToggle}
@@ -174,7 +191,6 @@ function OutcomeControl({
   isAdmin: boolean;
   onOutcome: (lead: Lead, v: string) => void;
 }) {
-  // Admin sees a read-only badge; telecaller gets the inline dropdown.
   if (isAdmin) {
     return (
       <Badge className={CALL_STATUS_COLORS[(lead.callStatus ?? 'pending') as CallStatus]}>
@@ -245,16 +261,12 @@ function ExpandedDetail({ lead, role }: { lead: Lead; role: Role }) {
     if (!v) return;
     scheduleFollowUp.mutate(
       { id: lead._id, scheduledAt: new Date(v).toISOString() },
-      {
-        onSuccess: () => toast.success('Follow-up scheduled'),
-        onError: (e) => toast.error(apiError(e)),
-      }
+      { onSuccess: () => toast.success('Follow-up scheduled'), onError: (e) => toast.error(apiError(e)) }
     );
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 lg:grid-cols-2">
-      {/* Details + follow-up */}
       <div className="space-y-2 text-sm">
         {lead.email && <Detail label="Email" value={lead.email} />}
         {lead.altPhone && <Detail label="Alt phone" value={lead.altPhone} />}
@@ -274,8 +286,6 @@ function ExpandedDetail({ lead, role }: { lead: Lead; role: Role }) {
           </div>
         )}
       </div>
-
-      {/* Remark timeline */}
       <div>
         <p className="mb-1 text-xs font-semibold text-slate-500">Remarks</p>
         <div className="max-h-48 space-y-1.5 overflow-y-auto">
@@ -314,6 +324,7 @@ function Row({
   lead,
   isAdmin,
   role,
+  pad,
   selectable,
   selected,
   onToggle,
@@ -324,6 +335,7 @@ function Row({
   lead: Lead;
   isAdmin: boolean;
   role: Role;
+  pad: string;
   selectable?: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
@@ -337,21 +349,16 @@ function Row({
     <>
       <tr className="border-b border-slate-100 hover:bg-slate-50/60">
         {selectable && (
-          <td className="p-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={selected}
-              onChange={() => onToggle(lead._id)}
-            />
+          <td className={pad}>
+            <input type="checkbox" className="h-4 w-4" checked={selected} onChange={() => onToggle(lead._id)} />
           </td>
         )}
-        <td className="p-2">
+        <td className={pad}>
           <button onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-slate-600">
             {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         </td>
-        <td className="p-2">
+        <td className={pad}>
           <div className="flex items-center gap-2">
             <p className="font-medium text-slate-800">{lead.name}</p>
             <Badge className={LEAD_STATUS_COLORS[lead.status]}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
@@ -359,27 +366,22 @@ function Row({
           </div>
           {lead.title && <p className="text-xs text-slate-400">{lead.title}</p>}
         </td>
-        <td className="p-2 text-slate-500">
+        <td className={`${pad} text-slate-500`}>
           {lead.company || '—'}
           {location(lead) ? <span className="text-slate-400"> · {location(lead)}</span> : ''}
         </td>
-        <td className="p-2">
+        <td className={pad}>
           <div className="flex gap-1.5">
             <a href={telLink(lead.phone)} className="rounded p-1.5 text-brand-600 hover:bg-brand-50" title={lead.phone}>
               <Phone size={15} />
             </a>
-            <a
-              href={whatsappLink(lead.phone)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50"
-            >
+            <a href={whatsappLink(lead.phone)} target="_blank" rel="noreferrer" className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50">
               <MessageCircle size={15} />
             </a>
           </div>
         </td>
         {isAdmin && (
-          <td className="p-2">
+          <td className={pad}>
             {onAssign ? (
               <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />
             ) : (
@@ -387,10 +389,10 @@ function Row({
             )}
           </td>
         )}
-        <td className="p-2">
+        <td className={pad}>
           <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />
         </td>
-        <td className="p-2">
+        <td className={pad}>
           <RemarkCell lead={lead} />
         </td>
       </tr>

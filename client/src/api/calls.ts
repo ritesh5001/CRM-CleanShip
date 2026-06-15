@@ -88,6 +88,7 @@ export function useLogCall() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
       qc.invalidateQueries({ queryKey: ['followups'] });
       qc.invalidateQueries({ queryKey: ['my-stats'] });
     },

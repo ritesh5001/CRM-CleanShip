@@ -1,11 +1,14 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Phone } from 'lucide-react';
+import { LogOut, Phone, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useUiStore } from '@/store/ui';
 import { NAV } from './nav';
 import { NotificationBell } from './NotificationBell';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
+  const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const navigate = useNavigate();
   const items = user ? NAV[user.role] : [];
 
@@ -17,35 +20,53 @@ export function AppLayout() {
   return (
     <div className="flex h-full">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex items-center gap-2 px-5 py-4">
+      <aside
+        className={`hidden flex-col border-r border-slate-200 bg-white transition-[width] duration-200 md:flex ${
+          collapsed ? 'w-16' : 'w-60'
+        }`}
+      >
+        <div className={`flex items-center py-4 ${collapsed ? 'justify-center px-2' : 'gap-2 px-5'}`}>
           <div className="rounded-lg bg-brand-600 p-1.5 text-white">
             <Phone size={18} />
           </div>
-          <span className="font-bold text-slate-800">CleanShip CRM</span>
+          {!collapsed && <span className="font-bold text-slate-800">CleanShip CRM</span>}
         </div>
-        <nav className="flex-1 space-y-1 px-3 py-2">
+        <nav className="flex-1 space-y-1 px-2 py-2">
           {items.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-                }`
+                `flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  collapsed ? 'justify-center' : 'gap-3'
+                } ${isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'}`
               }
             >
               <item.icon size={18} />
-              {item.label}
+              {!collapsed && item.label}
             </NavLink>
           ))}
         </nav>
         <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-slate-500 hover:text-rose-600"
+          onClick={toggleSidebar}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={`flex items-center px-3 py-2 text-sm font-medium text-slate-400 hover:text-slate-600 ${
+            collapsed ? 'justify-center' : 'gap-3 px-5'
+          }`}
         >
-          <LogOut size={18} /> Log out
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          {!collapsed && 'Collapse'}
+        </button>
+        <button
+          onClick={handleLogout}
+          title={collapsed ? 'Log out' : undefined}
+          className={`flex items-center py-4 text-sm font-medium text-slate-500 hover:text-rose-600 ${
+            collapsed ? 'justify-center px-3' : 'gap-3 px-5'
+          }`}
+        >
+          <LogOut size={18} /> {!collapsed && 'Log out'}
         </button>
       </aside>
 

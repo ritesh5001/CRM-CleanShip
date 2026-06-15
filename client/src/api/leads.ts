@@ -11,8 +11,33 @@ export interface LeadQuery {
   assignedTo?: string;
   qualified?: string;
   callStatus?: string;
+  sortBy?: string;
+  order?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+export interface LeadStats {
+  total: number;
+  notCalled: number;
+  done: number;
+  notDone: number;
+  leads: number;
+}
+
+export function useLeadStats(params: LeadQuery = {}) {
+  // Stats ignore callStatus/page/limit (server recomputes per chip within the scope).
+  const { callStatus: _c, page: _p, limit: _l, ...scope } = params;
+  return useQuery({
+    queryKey: ['lead-stats', scope],
+    queryFn: async () => (await api.get<{ stats: LeadStats }>('/leads/stats', { params: scope })).data.stats,
+  });
+}
+
+export async function fetchLeadsForExport(params: LeadQuery): Promise<Lead[]> {
+  const { page: _p, limit: _l, ...rest } = params;
+  const { data } = await api.get<{ data: Lead[] }>('/leads/export', { params: rest });
+  return data.data;
 }
 
 export function useLeads(params: LeadQuery = {}) {
@@ -114,7 +139,10 @@ export function useAssignLead() {
       return { snapshots };
     },
     onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+    },
   });
 }
 
@@ -141,7 +169,10 @@ export function useBulkAssignLeads() {
       return { snapshots };
     },
     onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+    },
   });
 }
 
