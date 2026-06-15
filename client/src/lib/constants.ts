@@ -1,4 +1,4 @@
-import type { Disposition, LeadStatus, TaskStatus } from '@/types';
+import type { CallStatus, Disposition, LeadStatus, TaskStatus } from '@/types';
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: 'New',
@@ -53,4 +53,16 @@ export const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-slate-100 text-slate-600',
   medium: 'bg-blue-100 text-blue-700',
   high: 'bg-rose-100 text-rose-700',
+};
+
+export const CALL_STATUS_LABELS: Record<CallStatus, string> = {
+  pending: 'Not Called',
+  done: 'Call Done',
+  not_done: 'Not Done',
+};
+
+export const CALL_STATUS_COLORS: Record<CallStatus, string> = {
+  pending: 'bg-slate-100 text-slate-600',
+  done: 'bg-emerald-100 text-emerald-700',
+  not_done: 'bg-amber-100 text-amber-700',
 };

@@ -4,6 +4,7 @@ import { ProtectedRoute, RoleRoute } from './guards';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { TelecallersPage } from '@/pages/TelecallersPage';
+import { ContactsPage } from '@/pages/ContactsPage';
 import { LeadsPage } from '@/pages/LeadsPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { FollowUpsPage } from '@/pages/FollowUpsPage';
@@ -28,6 +29,7 @@ export function AppRoutes() {
             </RoleRoute>
           }
         />
+        <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/followups" element={<FollowUpsPage />} />

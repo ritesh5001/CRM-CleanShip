@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import { validate } from '../middleware/validate.js';
 import { uploadSpreadsheet } from '../middleware/upload.js';
 import {
+  addRemarkSchema,
   assignLeadSchema,
   bulkAssignSchema,
   createLeadSchema,
@@ -27,5 +28,8 @@ router.delete('/:id', requireRole('superadmin'), ctrl.deleteLead);
 // Read one + update — both roles (telecaller scoped in controller).
 router.get('/:id', ctrl.getLead);
 router.put('/:id', validate(updateLeadSchema), ctrl.updateLead);
+
+// Remarks — both roles (telecaller scoped to assigned contacts in controller).
+router.post('/:id/remarks', validate(addRemarkSchema), ctrl.addRemark);
 
 export default router;

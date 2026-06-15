@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Phone, Contact, ListChecks, CalendarClock, AlertTriangle } from 'lucide-react';
+import { Phone, Contact, Star, ListChecks, CalendarClock, AlertTriangle } from 'lucide-react';
 import { useMyStats } from '@/api/reports';
 import { useAuthStore } from '@/store/auth';
 import { Card, Spinner, StatCard } from '@/components/ui/Misc';
@@ -41,9 +41,12 @@ export function TelecallerDashboard() {
         <p className="mt-1 text-xs text-slate-400">{data.targetProgress}% of daily target</p>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Link to="/contacts">
+          <StatCard label="My Contacts" value={data.myContacts} icon={<Contact size={18} />} />
+        </Link>
         <Link to="/leads">
-          <StatCard label="My Leads" value={data.myLeads} icon={<Contact size={18} />} />
+          <StatCard label="Leads" value={data.myLeads} icon={<Star size={18} />} />
         </Link>
         <Link to="/tasks">
           <StatCard label="Pending Tasks" value={data.pendingTasks} icon={<ListChecks size={18} />} />

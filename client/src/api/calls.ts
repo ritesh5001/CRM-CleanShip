@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { CallLog, Disposition, Paginated } from '@/types';
+import type { CallLog, CallStatus, Disposition, Paginated } from '@/types';
 
 export function useCalls(params: { lead?: string; telecaller?: string; page?: number } = {}) {
   return useQuery({
@@ -17,8 +17,10 @@ export function useLogCall() {
   return useMutation({
     mutationFn: async (payload: {
       lead: string;
-      disposition: Disposition;
+      callStatus: CallStatus;
+      disposition?: Disposition;
       notes?: string;
+      remark?: string;
       durationSec?: number;
       nextFollowUpAt?: string;
     }) => (await api.post('/calls', payload)).data,

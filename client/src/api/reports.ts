@@ -18,6 +18,7 @@ export interface MyStats {
   dailyTarget: number;
   callsToday: number;
   targetProgress: number;
+  myContacts: number;
   myLeads: number;
   pendingTasks: number;
   followUpsToday: number;

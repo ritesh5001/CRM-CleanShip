@@ -7,6 +7,8 @@ export interface LeadQuery {
   status?: string;
   priority?: string;
   assignedTo?: string;
+  qualified?: string;
+  callStatus?: string;
   page?: number;
   limit?: number;
 }
@@ -17,6 +19,21 @@ export function useLeads(params: LeadQuery = {}) {
     queryFn: async () => {
       const { data } = await api.get<{ success: boolean } & Paginated<Lead>>('/leads', { params });
       return data;
+    },
+  });
+}
+
+/** Contacts are the full list (no qualified filter); Leads are the qualified subset. */
+export const useContacts = useLeads;
+
+export function useAddRemark() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) =>
+      (await api.post(`/leads/${id}/remarks`, { text })).data,
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead', v.id] });
     },
   });
 }

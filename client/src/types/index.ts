@@ -38,11 +38,26 @@ export interface Lead {
   tags?: string[];
   status: LeadStatus;
   priority: 'low' | 'medium' | 'high';
+  qualified?: boolean;
+  callStatus?: CallStatus;
+  lastOutcome?: string;
+  remarks?: Remark[];
   assignedTo?: User | string | null;
   assignedAt?: string;
   lastContactedAt?: string;
   nextFollowUpAt?: string;
   notes?: string;
+  createdAt: string;
+}
+
+export type CallStatus = 'pending' | 'done' | 'not_done';
+
+export interface Remark {
+  _id?: string;
+  text: string;
+  by?: string;
+  byName?: string;
+  byRole?: string;
   createdAt: string;
 }
 

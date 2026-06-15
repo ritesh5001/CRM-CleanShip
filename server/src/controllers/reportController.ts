@@ -80,11 +80,12 @@ export const myStats = asyncHandler(async (req: Request, res: Response) => {
   const uid = new Types.ObjectId(req.user!.id);
   const today = { $gte: startOfToday(), $lte: endOfToday() };
 
-  const [user, callsToday, myLeads, pendingTasks, followUpsToday, overdueFollowUps, dispToday] =
+  const [user, callsToday, myContacts, myLeads, pendingTasks, followUpsToday, overdueFollowUps, dispToday] =
     await Promise.all([
       User.findById(uid).select('dailyTarget name'),
       CallLog.countDocuments({ telecaller: uid, createdAt: today }),
       Lead.countDocuments({ assignedTo: uid }),
+      Lead.countDocuments({ assignedTo: uid, qualified: true }),
       Task.countDocuments({ assignedTo: uid, status: { $in: ['pending', 'in_progress'] } }),
       FollowUp.countDocuments({ telecaller: uid, status: 'pending', scheduledAt: today }),
       FollowUp.countDocuments({
@@ -106,6 +107,7 @@ export const myStats = asyncHandler(async (req: Request, res: Response) => {
       dailyTarget: target,
       callsToday,
       targetProgress: target ? Number(((callsToday / target) * 100).toFixed(0)) : 0,
+      myContacts,
       myLeads,
       pendingTasks,
       followUpsToday,

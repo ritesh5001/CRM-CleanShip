@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Users,
   Contact,
+  Star,
   ListChecks,
   CalendarClock,
   type LucideIcon,
@@ -18,13 +19,15 @@ export const NAV: Record<Role, NavItem[]> = {
   superadmin: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/telecallers', label: 'Telecallers', icon: Users },
-    { to: '/leads', label: 'Leads', icon: Contact },
+    { to: '/contacts', label: 'Contacts', icon: Contact },
+    { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
   ],
   telecaller: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/leads', label: 'My Leads', icon: Contact },
-    { to: '/tasks', label: 'My Tasks', icon: ListChecks },
+    { to: '/contacts', label: 'Contacts', icon: Contact },
+    { to: '/leads', label: 'Leads', icon: Star },
+    { to: '/tasks', label: 'Tasks', icon: ListChecks },
     { to: '/followups', label: 'Follow-ups', icon: CalendarClock },
   ],
 };

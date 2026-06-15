@@ -39,10 +39,13 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 
 - **User** — `name, email, phone, passwordHash, role, isActive, dailyTarget, createdBy, lastLoginAt`.
   Methods: `setPassword`, `comparePassword` (bcrypt). `passwordHash` is `select:false`.
-- **Lead** — `name, phone, altPhone, email, title, company, city, state, country, source, tags,
-  status, priority, assignedTo, assignedAt, lastContactedAt, nextFollowUpAt, notes, createdBy,
-  importBatch`.
+- **Lead (= Contact)** — the collection stores **all contacts**; `qualified` marks the ones promoted
+  to Leads. Fields: `name, phone, altPhone, email, title, company, city, state, country, source, tags,
+  status, priority, qualified, callStatus(pending|done|not_done), lastOutcome, remarks[], assignedTo,
+  assignedAt, lastContactedAt, nextFollowUpAt, notes, createdBy, importBatch`.
   Statuses: new, assigned, in_progress, interested, callback, not_interested, converted, dnd.
+  `remarks[]` is a shared timeline `{ text, by, byName, byRole, createdAt }` both roles append to.
+  **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
 - **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt`.
@@ -56,12 +59,17 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 - **Auth:** `POST /auth/login`, `GET /auth/me`, `PUT /auth/change-password`, `POST /auth/logout`.
 - **Users (superadmin):** `GET/POST /users`, `GET/PUT/DELETE /users/:id`,
   `PATCH /users/:id/status|target|reset-password`.
-- **Leads:** `GET /leads`, `POST /leads`, `GET/PUT/DELETE /leads/:id`, `POST /leads/import`,
-  `PATCH /leads/bulk-assign`, `PATCH /leads/:id/assign`. (Writes/import/assign are superadmin-only;
-  telecallers get a scoped `GET`/`PUT`.)
+- **Leads/Contacts:** `GET /leads` (use `?qualified=true` for the Leads view, `?callStatus=`, search,
+  status filters), `POST /leads`, `GET/PUT/DELETE /leads/:id`, `POST /leads/import`,
+  `PATCH /leads/bulk-assign`, `PATCH /leads/:id/assign`, `POST /leads/:id/remarks` (both roles add to
+  the shared timeline; telecaller scoped to assigned). Writes/import/assign are superadmin-only;
+  telecallers get a scoped `GET`/`PUT`.
 - **Tasks:** `GET /tasks`, `POST /tasks` (admin), `GET /tasks/:id`, `PUT /tasks/:id` (admin),
   `PATCH /tasks/:id/status`, `DELETE /tasks/:id` (admin).
-- **Calls:** `GET /calls`, `POST /calls` (logs disposition → updates lead, creates follow-up).
+- **Calls:** `GET /calls`, `POST /calls` — telecaller call update: `callStatus: done|not_done`,
+  optional `disposition` (required when done), optional `remark` + `nextFollowUpAt`. Done → logs a
+  CallLog, maps lead status, appends remark, and promotes to a Lead (`qualified`) when
+  interested/converted. Not-done → records the attempt only.
 - **Follow-ups:** `GET /followups?scope=today|upcoming|overdue|all`, `PATCH /followups/:id/done`.
 - **Notifications:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`.
 - **Reports:** `GET /reports/overview` (admin), `GET /reports/me` (telecaller).

@@ -20,6 +20,10 @@ function buildFilter(req: Request): Record<string, unknown> {
 
   if (typeof req.query.status === 'string' && req.query.status) filter.status = req.query.status;
   if (typeof req.query.priority === 'string' && req.query.priority) filter.priority = req.query.priority;
+  if (typeof req.query.callStatus === 'string' && req.query.callStatus) filter.callStatus = req.query.callStatus;
+  // Leads tab passes qualified=true; Contacts tab omits it (shows everything).
+  if (req.query.qualified === 'true') filter.qualified = true;
+  else if (req.query.qualified === 'false') filter.qualified = false;
 
   if (typeof req.query.search === 'string' && req.query.search.trim()) {
     const rx = new RegExp(req.query.search.trim(), 'i');
@@ -88,6 +92,41 @@ export const deleteLead = asyncHandler(async (req: Request, res: Response) => {
   const lead = await Lead.findByIdAndDelete(req.params.id);
   if (!lead) throw ApiError.notFound('Lead not found');
   res.json({ success: true, message: 'Lead deleted' });
+});
+
+// POST /leads/:id/remarks — both roles add to the shared remark timeline.
+export const addRemark = asyncHandler(async (req: Request, res: Response) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) throw ApiError.notFound('Contact not found');
+
+  // Telecallers may only remark on contacts assigned to them.
+  if (req.user!.role === 'telecaller' && idOf(lead.assignedTo) !== req.user!.id) {
+    throw ApiError.forbidden('This contact is not assigned to you');
+  }
+
+  lead.remarks.push({
+    text: req.body.text,
+    by: req.user!.id,
+    byName: req.user!.name,
+    byRole: req.user!.role,
+    createdAt: new Date(),
+  });
+  await lead.save();
+
+  // Notify the counterparty: superadmin → assigned telecaller; telecaller → contact creator.
+  const recipient =
+    req.user!.role === 'superadmin' ? idOf(lead.assignedTo) : idOf(lead.createdBy);
+  if (recipient && recipient !== req.user!.id) {
+    await notify({
+      recipient,
+      type: 'system',
+      title: `New remark on ${lead.name}`,
+      message: req.body.text,
+      link: `/contacts`,
+    });
+  }
+
+  res.status(201).json({ success: true, lead });
 });
 
 async function assertTelecaller(id: string) {
