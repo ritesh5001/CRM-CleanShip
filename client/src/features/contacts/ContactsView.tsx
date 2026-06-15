@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Plus, Upload, Search, Download, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -32,6 +32,17 @@ const STATUSES: LeadStatus[] = [
   'converted',
   'dnd',
 ];
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 const SORT_FIELDS: { value: string; label: string }[] = [
   { value: 'createdAt', label: 'Added' },
@@ -219,8 +230,9 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
       )}
 
       {/* Top filter toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
+      <div className="space-y-2">
+        {/* Search */}
+        <div className="relative">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
           <Input
             className="pl-9"
@@ -232,59 +244,82 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
             }}
           />
         </div>
-        <Select className="w-36" value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }}>
-          <option value="">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
-          ))}
-        </Select>
-        <Select className="w-32" value={callStatus} onChange={(e) => { setQualifiedChip(false); setCallStatus(e.target.value); resetPage(); }}>
-          <option value="">All calls</option>
-          <option value="pending">Not Called</option>
-          <option value="done">Call Done</option>
-          <option value="not_done">Not Done</option>
-        </Select>
-        {isAdmin && (
-          <Select className="w-40" value={assignedTo} onChange={(e) => { setAssignedTo(e.target.value); resetPage(); }}>
-            <option value="">All assignees</option>
-            <option value="unassigned">Unassigned</option>
-            {telecallers.map((t) => (
-              <option key={t._id} value={t._id}>{t.name}</option>
-            ))}
-          </Select>
-        )}
-        <Select className="w-36" value={sortBy} onChange={(e) => { setSortBy(e.target.value); resetPage(); }}>
-          {SORT_FIELDS.map((f) => (
-            <option key={f.value} value={f.value}>Sort: {f.label}</option>
-          ))}
-        </Select>
-        <Button size="sm" variant="secondary" onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}>
-          {order === 'asc' ? 'Asc ↑' : 'Desc ↓'}
-        </Button>
-        <Select className="w-24" value={String(limit)} onChange={(e) => { setLimit(Number(e.target.value)); resetPage(); }}>
-          <option value="50">50 / page</option>
-          <option value="100">100 / page</option>
-          <option value="200">200 / page</option>
-        </Select>
-        <div className="flex overflow-hidden rounded-lg border border-slate-300">
-          <button
-            onClick={() => setDensity('comfortable')}
-            className={`px-2 py-1.5 text-xs ${density === 'comfortable' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
-          >
-            Cozy
-          </button>
-          <button
-            onClick={() => setDensity('compact')}
-            className={`px-2 py-1.5 text-xs ${density === 'compact' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
-          >
-            Compact
-          </button>
+
+        {/* Aligned grid of filter controls */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <Field label="Status">
+            <Select value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }}>
+              <option value="">All statuses</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Call">
+            <Select value={callStatus} onChange={(e) => { setQualifiedChip(false); setCallStatus(e.target.value); resetPage(); }}>
+              <option value="">All calls</option>
+              <option value="pending">Not Called</option>
+              <option value="done">Call Done</option>
+              <option value="not_done">Not Done</option>
+            </Select>
+          </Field>
+          {isAdmin && (
+            <Field label="Assignee">
+              <Select value={assignedTo} onChange={(e) => { setAssignedTo(e.target.value); resetPage(); }}>
+                <option value="">All assignees</option>
+                <option value="unassigned">Unassigned</option>
+                {telecallers.map((t) => (
+                  <option key={t._id} value={t._id}>{t.name}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          <Field label="Sort by">
+            <Select value={sortBy} onChange={(e) => { setSortBy(e.target.value); resetPage(); }}>
+              {SORT_FIELDS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Order">
+            <button
+              onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              {order === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+            </button>
+          </Field>
+          <Field label="Rows">
+            <Select value={String(limit)} onChange={(e) => { setLimit(Number(e.target.value)); resetPage(); }}>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
+              <option value="200">200 / page</option>
+            </Select>
+          </Field>
+          <Field label="Density">
+            <div className="flex w-full overflow-hidden rounded-lg border border-slate-300">
+              <button
+                onClick={() => setDensity('comfortable')}
+                className={`flex-1 py-2 text-xs ${density === 'comfortable' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
+              >
+                Cozy
+              </button>
+              <button
+                onClick={() => setDensity('compact')}
+                className={`flex-1 py-2 text-xs ${density === 'compact' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
+              >
+                Compact
+              </button>
+            </div>
+          </Field>
+          {hasFilters && (
+            <Field label=" ">
+              <Button variant="ghost" className="w-full" onClick={clearFilters}>
+                <X size={14} /> Clear filters
+              </Button>
+            </Field>
+          )}
         </div>
-        {hasFilters && (
-          <Button size="sm" variant="ghost" onClick={clearFilters}>
-            <X size={14} /> Clear
-          </Button>
-        )}
       </div>
 
       {/* Inline bulk-assign bar */}
