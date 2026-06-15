@@ -18,6 +18,9 @@ interface Props {
   onToggle: (id: string) => void;
   onToggleAll: () => void;
   onOpen: (lead: Lead) => void;
+  /** Active telecallers for the inline assign dropdown (superadmin only). */
+  telecallers?: User[];
+  onAssign?: (leadId: string, telecallerId: string) => void;
   emptyHint?: string;
 }
 
@@ -34,9 +37,27 @@ export function ContactsTable({
   onToggle,
   onToggleAll,
   onOpen,
+  telecallers = [],
+  onAssign,
   emptyHint,
 }: Props) {
   const isAdmin = role === 'superadmin';
+
+  const AssignSelect = ({ lead }: { lead: Lead }) => (
+    <select
+      value={(lead.assignedTo as User | undefined)?._id ?? ''}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => e.target.value && onAssign?.(lead._id, e.target.value)}
+      className="max-w-[140px] rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+    >
+      <option value="">Assign…</option>
+      {telecallers.map((t) => (
+        <option key={t._id} value={t._id}>
+          {t.name}
+        </option>
+      ))}
+    </select>
+  );
 
   if (isLoading) return <Spinner />;
   if (!leads.length) return <EmptyState title="Nothing here yet" hint={emptyHint} />;
@@ -101,7 +122,13 @@ export function ContactsTable({
                     </Badge>
                   </td>
                   {isAdmin && (
-                    <td className="p-3 text-slate-600">{assignee?.name ?? <span className="text-slate-300">Unassigned</span>}</td>
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      {onAssign ? (
+                        <AssignSelect lead={lead} />
+                      ) : (
+                        assignee?.name ?? <span className="text-slate-300">Unassigned</span>
+                      )}
+                    </td>
                   )}
                   <td className="p-3">
                     <span className="inline-flex items-center gap-1 text-slate-500">
@@ -160,6 +187,11 @@ export function ContactsTable({
                   {isAdmin ? (assignee?.name ?? 'Unassigned') : LEAD_STATUS_LABELS[lead.status]}
                   {lead.remarks?.length ? ` · ${lead.remarks.length} remark(s)` : ''}
                 </p>
+                {isAdmin && onAssign && (
+                  <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                    <AssignSelect lead={lead} />
+                  </div>
+                )}
               </div>
               <a
                 href={telLink(lead.phone)}

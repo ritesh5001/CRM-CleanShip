@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Plus, Upload, Search, UserPlus } from 'lucide-react';
-import { useLeads } from '@/api/leads';
+import toast from 'react-hot-toast';
+import { useLeads, useAssignLead } from '@/api/leads';
+import { useTelecallers } from '@/api/users';
+import { apiError } from '@/api/client';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Field';
@@ -51,6 +54,19 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   const leads = data?.data ?? [];
   // Bulk assign + import only on the all-contacts view for the superadmin.
   const selectable = isAdmin && isContacts;
+
+  // Telecaller list + inline assign (superadmin only).
+  const { data: tcData } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: isAdmin });
+  const assign = useAssignLead();
+  function handleAssign(leadId: string, telecallerId: string) {
+    assign.mutate(
+      { id: leadId, assignedTo: telecallerId },
+      {
+        onSuccess: () => toast.success('Contact assigned'),
+        onError: (err) => toast.error(apiError(err)),
+      }
+    );
+  }
 
   function toggle(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -148,6 +164,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           onToggle={toggle}
           onToggleAll={toggleAll}
           onOpen={setOpenLead}
+          telecallers={tcData?.data ?? []}
+          onAssign={isAdmin ? handleAssign : undefined}
           emptyHint={
             isContacts
               ? isAdmin

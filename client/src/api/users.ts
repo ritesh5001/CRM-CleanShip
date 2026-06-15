@@ -9,9 +9,10 @@ export interface UserQuery {
   limit?: number;
 }
 
-export function useTelecallers(params: UserQuery = {}) {
+export function useTelecallers(params: UserQuery = {}, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['users', params],
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const { data } = await api.get<{ success: boolean } & Paginated<User>>('/users', { params });
       return data;
