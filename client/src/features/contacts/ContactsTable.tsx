@@ -116,7 +116,7 @@ export function ContactsTable({
               <th className="px-2 py-2"><SortHeader field="name" label="Name" /></th>
               <th className="px-2 py-2">Title</th>
               <th className="px-2 py-2"><SortHeader field="company" label="Company" /></th>
-              <th className="px-2 py-2">Location</th>
+              <th className="px-2 py-2"><SortHeader field="country" label="Location" /></th>
               <th className="px-2 py-2">Phone</th>
               <th className="px-2 py-2">Email</th>
               <th className="px-2 py-2">Priority</th>

@@ -48,6 +48,7 @@ const SORT_FIELDS: { value: string; label: string }[] = [
   { value: 'createdAt', label: 'Added' },
   { value: 'name', label: 'Name' },
   { value: 'company', label: 'Company' },
+  { value: 'country', label: 'Country' },
   { value: 'callStatus', label: 'Call status' },
   { value: 'lastContactedAt', label: 'Last contacted' },
 ];

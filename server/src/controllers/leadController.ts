@@ -39,6 +39,8 @@ function buildFilter(req: Request, includeCallStatus = true): Record<string, unk
 const SORTABLE = new Set([
   'name',
   'company',
+  'city',
+  'country',
   'status',
   'callStatus',
   'lastContactedAt',
