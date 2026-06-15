@@ -39,6 +39,11 @@ export const addRemarkSchema = z.object({
   text: z.string().min(1, 'Remark text is required'),
 });
 
+export const followUpSchema = z.object({
+  scheduledAt: z.coerce.date(),
+  notes: z.string().optional().default(''),
+});
+
 export const assignLeadSchema = z.object({
   assignedTo: z.string().min(1, 'assignedTo is required'),
 });

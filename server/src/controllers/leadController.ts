@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { Lead } from '../models/Lead.js';
 import { User } from '../models/User.js';
+import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
 import { importLeads } from '../services/importService.js';
 import { notify } from '../services/notificationService.js';
@@ -92,6 +93,43 @@ export const deleteLead = asyncHandler(async (req: Request, res: Response) => {
   const lead = await Lead.findByIdAndDelete(req.params.id);
   if (!lead) throw ApiError.notFound('Lead not found');
   res.json({ success: true, message: 'Lead deleted' });
+});
+
+// POST /leads/:id/followup — schedule a follow-up inline (no CallLog logged).
+export const scheduleFollowUp = asyncHandler(async (req: Request, res: Response) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) throw ApiError.notFound('Contact not found');
+
+  // Telecallers may only schedule follow-ups on contacts assigned to them.
+  if (req.user!.role === 'telecaller' && idOf(lead.assignedTo) !== req.user!.id) {
+    throw ApiError.forbidden('This contact is not assigned to you');
+  }
+
+  // The follow-up belongs to whoever the contact is assigned to (fallback: actor).
+  const telecaller = idOf(lead.assignedTo) || req.user!.id;
+
+  const followUp = await FollowUp.create({
+    lead: lead._id,
+    telecaller,
+    scheduledAt: req.body.scheduledAt,
+    notes: req.body.notes,
+  });
+
+  lead.nextFollowUpAt = req.body.scheduledAt;
+  await lead.save();
+
+  // If an admin scheduled it, notify the assigned telecaller.
+  if (req.user!.role === 'superadmin' && telecaller && telecaller !== req.user!.id) {
+    await notify({
+      recipient: telecaller,
+      type: 'followup_due',
+      title: `Follow-up scheduled: ${lead.name}`,
+      message: `Scheduled for ${new Date(req.body.scheduledAt).toLocaleString()}`,
+      link: '/followups',
+    });
+  }
+
+  res.status(201).json({ success: true, followUp, lead });
 });
 
 // POST /leads/:id/remarks — both roles add to the shared remark timeline.

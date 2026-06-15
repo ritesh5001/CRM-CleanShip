@@ -9,6 +9,7 @@ import {
   assignLeadSchema,
   bulkAssignSchema,
   createLeadSchema,
+  followUpSchema,
   updateLeadSchema,
 } from '../validators/leadValidators.js';
 
@@ -31,5 +32,8 @@ router.put('/:id', validate(updateLeadSchema), ctrl.updateLead);
 
 // Remarks — both roles (telecaller scoped to assigned contacts in controller).
 router.post('/:id/remarks', validate(addRemarkSchema), ctrl.addRemark);
+
+// Schedule a follow-up inline — both roles (telecaller scoped in controller).
+router.post('/:id/followup', validate(followUpSchema), ctrl.scheduleFollowUp);
 
 export default router;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus, Upload, Search, UserPlus } from 'lucide-react';
+import { Plus, Upload, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useLeads, useAssignLead } from '@/api/leads';
+import { useLeads, useAssignLead, useBulkAssignLeads } from '@/api/leads';
 import { useTelecallers } from '@/api/users';
 import { apiError } from '@/api/client';
 import { useAuthStore } from '@/store/auth';
@@ -9,12 +9,10 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Field';
 import { Card } from '@/components/ui/Misc';
 import { ContactsTable } from './ContactsTable';
-import { ContactDrawer } from './ContactDrawer';
 import { LeadFormModal } from '@/features/leads/LeadFormModal';
 import { ImportModal } from '@/features/leads/ImportModal';
-import { AssignModal } from '@/features/leads/AssignModal';
 import { LEAD_STATUS_LABELS } from '@/lib/constants';
-import type { Lead, LeadStatus } from '@/types';
+import type { LeadStatus } from '@/types';
 
 const STATUSES: LeadStatus[] = [
   'new',
@@ -40,8 +38,6 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [assignIds, setAssignIds] = useState<string[] | null>(null);
-  const [openLead, setOpenLead] = useState<Lead | null>(null);
 
   const { data, isLoading } = useLeads({
     search,
@@ -55,14 +51,29 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   // Bulk assign + import only on the all-contacts view for the superadmin.
   const selectable = isAdmin && isContacts;
 
-  // Telecaller list + inline assign (superadmin only).
+  // Telecaller list + assign (superadmin only).
   const { data: tcData } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: isAdmin });
+  const telecallers = tcData?.data ?? [];
   const assign = useAssignLead();
-  function handleAssign(leadId: string, telecallerId: string) {
+  const bulkAssign = useBulkAssignLeads();
+
+  function handleAssign(leadId: string, telecallerId: string, name: string) {
     assign.mutate(
-      { id: leadId, assignedTo: telecallerId },
+      { id: leadId, assignedTo: telecallerId, assignedToName: name },
+      { onSuccess: () => toast.success('Assigned'), onError: (err) => toast.error(apiError(err)) }
+    );
+  }
+
+  function handleBulkAssign(telecallerId: string) {
+    const t = telecallers.find((x) => x._id === telecallerId);
+    if (!t || !selected.length) return;
+    bulkAssign.mutate(
+      { leadIds: selected, assignedTo: telecallerId, assignedToName: t.name },
       {
-        onSuccess: () => toast.success('Contact assigned'),
+        onSuccess: () => {
+          toast.success(`Assigned ${selected.length} contact(s) to ${t.name}`);
+          setSelected([]);
+        },
         onError: (err) => toast.error(apiError(err)),
       }
     );
@@ -85,8 +96,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           <p className="text-sm text-slate-400">
             {isContacts
               ? isAdmin
-                ? 'All uploaded contacts. Assign them to telecallers to start calling.'
-                : 'Contacts assigned to you. Call them and log the outcome.'
+                ? 'All uploaded contacts. Assign them and track calls — all inline.'
+                : 'Your contacts. Set the outcome and add remarks right in the row.'
               : isAdmin
                 ? 'Interested contacts that converted into leads.'
                 : 'Your contacts that turned into interested leads.'}
@@ -148,12 +159,24 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         </Select>
       </div>
 
-      {/* Bulk-assign bar */}
+      {/* Inline bulk-assign bar */}
       {selectable && selected.length > 0 && (
-        <div className="flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2 text-sm">
-          <span>{selected.length} selected</span>
-          <Button size="sm" onClick={() => setAssignIds(selected)}>
-            <UserPlus size={14} /> Assign selected
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 px-4 py-2 text-sm">
+          <span className="font-medium">{selected.length} selected</span>
+          <Select
+            className="w-52"
+            value=""
+            onChange={(e) => handleBulkAssign(e.target.value)}
+          >
+            <option value="">Assign selected to…</option>
+            {telecallers.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+            Clear
           </Button>
         </div>
       )}
@@ -167,15 +190,14 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           selected={selected}
           onToggle={toggle}
           onToggleAll={toggleAll}
-          onOpen={setOpenLead}
-          telecallers={tcData?.data ?? []}
+          telecallers={telecallers}
           onAssign={isAdmin ? handleAssign : undefined}
           emptyHint={
             isContacts
               ? isAdmin
                 ? 'Import or add contacts to begin.'
                 : 'No contacts assigned to you yet.'
-              : 'No leads yet — mark a call “Interested” to create one.'
+              : 'No leads yet — set a call outcome to “Interested” to create one.'
           }
         />
       </Card>
@@ -204,17 +226,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         <>
           <LeadFormModal open={formOpen} onClose={() => setFormOpen(false)} />
           <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
-          <AssignModal
-            open={!!assignIds}
-            leadIds={assignIds ?? []}
-            onClose={() => {
-              setAssignIds(null);
-              setSelected([]);
-            }}
-          />
         </>
       )}
-      <ContactDrawer lead={openLead} role={role} onClose={() => setOpenLead(null)} />
     </div>
   );
 }

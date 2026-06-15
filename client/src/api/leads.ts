@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { patchLeadInLists } from './calls';
+import { useAuthStore } from '@/store/auth';
 import type { Lead, Paginated } from '@/types';
 
 export interface LeadQuery {
@@ -28,12 +30,43 @@ export const useContacts = useLeads;
 
 export function useAddRemark() {
   const qc = useQueryClient();
+  const user = useAuthStore.getState().user;
   return useMutation({
     mutationFn: async ({ id, text }: { id: string; text: string }) =>
       (await api.post(`/leads/${id}/remarks`, { text })).data,
-    onSuccess: (_d, v) => {
+    onMutate: async ({ id, text }) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const snapshots = patchLeadInLists(qc, id, (l) => ({
+        ...l,
+        remarks: [
+          ...(l.remarks ?? []),
+          { text, byName: user?.name, byRole: user?.role, createdAt: new Date().toISOString() },
+        ],
+      }));
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['lead', v.id] });
+    },
+  });
+}
+
+export function useScheduleFollowUp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, scheduledAt, notes }: { id: string; scheduledAt: string; notes?: string }) =>
+      (await api.post(`/leads/${id}/followup`, { scheduledAt, notes })).data,
+    onMutate: async ({ id, scheduledAt }) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const snapshots = patchLeadInLists(qc, id, (l) => ({ ...l, nextFollowUpAt: scheduledAt }));
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['followups'] });
     },
   });
 }
@@ -69,18 +102,46 @@ export function useUpdateLead() {
 export function useAssignLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string }) =>
+    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string; assignedToName?: string }) =>
       (await api.patch(`/leads/${id}/assign`, { assignedTo })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onMutate: async ({ id, assignedTo, assignedToName }) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const snapshots = patchLeadInLists(qc, id, (l) => ({
+        ...l,
+        assignedTo: { _id: assignedTo, name: assignedToName ?? '' } as Lead['assignedTo'],
+        status: l.status === 'new' ? 'assigned' : l.status,
+      }));
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['leads'] }),
   });
 }
 
 export function useBulkAssignLeads() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ leadIds, assignedTo }: { leadIds: string[]; assignedTo: string }) =>
+    mutationFn: async ({ leadIds, assignedTo }: { leadIds: string[]; assignedTo: string; assignedToName?: string }) =>
       (await api.patch('/leads/bulk-assign', { leadIds, assignedTo })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+    onMutate: async ({ leadIds, assignedTo, assignedToName }) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const ids = new Set(leadIds);
+      const snapshots = qc.getQueriesData<{ data: Lead[] }>({ queryKey: ['leads'] });
+      qc.setQueriesData<{ data: Lead[] }>({ queryKey: ['leads'] }, (old) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((l) =>
+            ids.has(l._id)
+              ? { ...l, assignedTo: { _id: assignedTo, name: assignedToName ?? '' } as Lead['assignedTo'], status: l.status === 'new' ? 'assigned' : l.status }
+              : l
+          ),
+        };
+      });
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['leads'] }),
   });
 }
 
