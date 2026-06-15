@@ -9,8 +9,23 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
+  // CLIENT_ORIGIN may be a comma-separated list of allowed origins.
+  const allowedOrigins = env.clientOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.use(helmet());
-  app.use(cors({ origin: env.clientOrigin, credentials: true }));
+  app.use(
+    cors({
+      origin(origin, callback) {
+        // Allow non-browser requests (no Origin header) and any whitelisted origin.
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`Origin not allowed by CORS: ${origin}`));
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
   if (!env.isProd) app.use(morgan('dev'));
