@@ -60,6 +60,29 @@ function copyPhone(phone: string) {
     .catch(() => toast.error('Copy failed'));
 }
 
+/** Inline follow-up scheduler (both roles; telecaller scoped server-side). */
+function FollowUpCell({ lead }: { lead: Lead }) {
+  const schedule = useScheduleFollowUp();
+  return (
+    <div onClick={(e) => e.stopPropagation()} className="space-y-0.5">
+      <input
+        type="datetime-local"
+        onChange={(e) =>
+          e.target.value &&
+          schedule.mutate(
+            { id: lead._id, scheduledAt: new Date(e.target.value).toISOString() },
+            { onSuccess: () => toast.success('Follow-up scheduled'), onError: (err) => toast.error(apiError(err)) }
+          )
+        }
+        className="w-[168px] rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+      />
+      {lead.nextFollowUpAt && (
+        <p className="text-[11px] text-slate-400">Next: {fmtDate(lead.nextFollowUpAt)}</p>
+      )}
+    </div>
+  );
+}
+
 /** Copy (left) · Call · WhatsApp actions for a phone number. */
 function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
   const size = big ? 16 : 15;
@@ -141,7 +164,7 @@ export function ContactsTable({
     <>
       {/* Desktop grid (horizontally scrollable) */}
       <div className="hidden md:block">
-        <table className="w-full min-w-[1400px] text-sm">
+        <table className="w-full min-w-[1650px] text-sm">
           <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
               {selectable && (
@@ -155,6 +178,7 @@ export function ContactsTable({
               <th className="px-2 py-2"><SortHeader field="company" label="Company" /></th>
               <th className="px-2 py-2"><SortHeader field="country" label="Location" /></th>
               <th className="px-2 py-2">Phone</th>
+              <th className="px-2 py-2">Alt Phone</th>
               <th className="px-2 py-2">Email</th>
               <th className="px-2 py-2">Priority</th>
               {isAdmin && <th className="px-2 py-2"><SortHeader field="assignedAt" label="Assigned To" /></th>}
@@ -334,18 +358,10 @@ function RemarkCell({ lead }: { lead: Lead }) {
   );
 }
 
-function ExpandedDetail({ lead, role, isAdmin }: { lead: Lead; role: Role; isAdmin: boolean }) {
-  const scheduleFollowUp = useScheduleFollowUp();
+function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
   const del = useDeleteLead();
   const loc = location(lead);
 
-  function onDate(v: string) {
-    if (!v) return;
-    scheduleFollowUp.mutate(
-      { id: lead._id, scheduledAt: new Date(v).toISOString() },
-      { onSuccess: () => toast.success('Follow-up scheduled'), onError: (e) => toast.error(apiError(e)) }
-    );
-  }
   function onDelete() {
     if (!confirm(`Delete contact "${lead.name}"? This cannot be undone.`)) return;
     del.mutate(lead._id, {
@@ -365,20 +381,8 @@ function ExpandedDetail({ lead, role, isAdmin }: { lead: Lead; role: Role; isAdm
       </div>
       <div className="space-y-2 text-sm">
         {lead.lastContactedAt && <Detail label="Last contacted" value={fmtDateTime(lead.lastContactedAt)} />}
+        {lead.nextFollowUpAt && <Detail label="Next follow-up" value={fmtDateTime(lead.nextFollowUpAt)} />}
         <Detail label="Added" value={fmtDateTime(lead.createdAt)} />
-        {role === 'telecaller' && (
-          <div>
-            <span className="text-xs text-slate-400">Schedule follow-up</span>
-            <input
-              type="datetime-local"
-              onChange={(e) => onDate(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
-            />
-            {lead.nextFollowUpAt && (
-              <p className="mt-1 text-[11px] text-slate-400">Next: {fmtDateTime(lead.nextFollowUpAt)}</p>
-            )}
-          </div>
-        )}
         {isAdmin && (
           <Button size="sm" variant="danger" onClick={onDelete}>
             <Trash2 size={14} /> Delete contact
@@ -471,6 +475,9 @@ function Row({
         <td className={pad}>
           <PhoneActions phone={lead.phone} />
         </td>
+        <td className={pad}>
+          {lead.altPhone ? <PhoneActions phone={lead.altPhone} /> : <span className="text-slate-300">—</span>}
+        </td>
         <td className={`${pad} ${muted}`}>
           {lead.email ? (
             <a href={`mailto:${lead.email}`} className="hover:text-brand-600" onClick={(e) => e.stopPropagation()}>
@@ -496,7 +503,9 @@ function Row({
           <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />
         </td>
         <td className={`${pad} ${muted}`}>{lead.lastContactedAt ? fmtDate(lead.lastContactedAt) : '—'}</td>
-        <td className={`${pad} ${muted}`}>{lead.nextFollowUpAt ? fmtDate(lead.nextFollowUpAt) : '—'}</td>
+        <td className={pad}>
+          <FollowUpCell lead={lead} />
+        </td>
         <td className={`${pad} ${muted}`}>{fmtDate(lead.createdAt)}</td>
         <td className={pad}>
           <RemarkCell lead={lead} />
@@ -505,7 +514,7 @@ function Row({
       {open && (
         <tr>
           <td colSpan={99} className="p-0">
-            <ExpandedDetail lead={lead} role={role} isAdmin={isAdmin} />
+            <ExpandedDetail lead={lead} isAdmin={isAdmin} />
           </td>
         </tr>
       )}
@@ -568,7 +577,7 @@ function MobileCard({
       </div>
       {open && (
         <div className="mt-2 overflow-hidden rounded-lg">
-          <ExpandedDetail lead={lead} role={role} isAdmin={isAdmin} />
+          <ExpandedDetail lead={lead} isAdmin={isAdmin} />
         </div>
       )}
     </div>
