@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Plus, Upload, Search, Download, X } from 'lucide-react';
+import { Plus, Upload, Search, Download, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   useLeads,
@@ -60,6 +60,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
 
   const density = useUiStore((s) => s.density);
   const setDensity = useUiStore((s) => s.setDensity);
+  const filtersCollapsed = useUiStore((s) => s.filtersCollapsed);
+  const toggleFilters = useUiStore((s) => s.toggleFilters);
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -213,6 +215,20 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         </div>
       </div>
 
+      {/* Filters toggle (collapsible) */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={toggleFilters}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          <SlidersHorizontal size={14} /> Filters
+          {filtersCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+        </button>
+        {filtersCollapsed && hasFilters && <span className="text-xs text-brand-600">filters active</span>}
+      </div>
+
+      {!filtersCollapsed && (
+        <>
       {/* Stat chips */}
       {isContacts && chips.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -322,6 +338,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Inline bulk-assign bar */}
       {selectable && selected.length > 0 && (
