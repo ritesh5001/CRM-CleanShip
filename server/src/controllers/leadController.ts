@@ -262,6 +262,12 @@ export const bulkAssignLeads = asyncHandler(async (req: Request, res: Response) 
   res.json({ success: true, modified: result.modifiedCount });
 });
 
+export const bulkDeleteLeads = asyncHandler(async (req: Request, res: Response) => {
+  const { leadIds } = req.body as { leadIds: string[] };
+  const result = await Lead.deleteMany({ _id: { $in: leadIds } });
+  res.json({ success: true, deleted: result.deletedCount });
+});
+
 export const importLeadsHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) throw ApiError.badRequest('No file uploaded (field name must be "file")');
   const assignedTo = typeof req.body.assignedTo === 'string' && req.body.assignedTo ? req.body.assignedTo : undefined;

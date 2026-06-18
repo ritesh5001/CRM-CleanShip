@@ -53,6 +53,10 @@ export const bulkAssignSchema = z.object({
   assignedTo: z.string().min(1, 'assignedTo is required'),
 });
 
+export const bulkDeleteSchema = z.object({
+  leadIds: z.array(z.string().min(1)).min(1, 'Select at least one contact'),
+});
+
 export const phoneOutcomeSchema = z
   .object({
     phone: z.enum(['phone1', 'phone2']),

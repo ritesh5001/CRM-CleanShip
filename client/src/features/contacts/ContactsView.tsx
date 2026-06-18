@@ -1,11 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Plus, Upload, Search, Download, X, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Upload, Search, Download, X, SlidersHorizontal, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   useLeads,
   useLeadStats,
   useAssignLead,
   useBulkAssignLeads,
+  useBulkDeleteLeads,
   fetchLeadsForExport,
   type LeadQuery,
 } from '@/api/leads';
@@ -105,6 +106,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   const telecallers = tcData?.data ?? [];
   const assign = useAssignLead();
   const bulkAssign = useBulkAssignLeads();
+  const bulkDelete = useBulkDeleteLeads();
 
   function resetPage() { setPage(1); }
 
@@ -124,6 +126,14 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         onError: (err) => toast.error(apiError(err)),
       }
     );
+  }
+  function handleBulkDelete() {
+    if (!selected.length) return;
+    if (!confirm(`Delete ${selected.length} contact${selected.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    bulkDelete.mutate(selected, {
+      onSuccess: () => { toast.success(`Deleted ${selected.length} contact${selected.length > 1 ? 's' : ''}`); setSelected([]); },
+      onError: (err) => toast.error(apiError(err)),
+    });
   }
   function onSort(field: string) {
     if (sortBy === field) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
@@ -340,7 +350,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         </div>
       )}
 
-      {/* Bulk-assign bar */}
+      {/* Bulk-action bar */}
       {selectable && selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 px-4 py-2 text-sm">
           <span className="font-medium">{selected.length} selected</span>
@@ -350,6 +360,9 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
               <option key={t._id} value={t._id}>{t.name}</option>
             ))}
           </Select>
+          <Button size="sm" variant="danger" onClick={handleBulkDelete} loading={bulkDelete.isPending}>
+            <Trash2 size={14} /> Delete
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button>
         </div>
       )}

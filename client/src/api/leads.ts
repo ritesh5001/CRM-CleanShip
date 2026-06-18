@@ -184,6 +184,28 @@ export function useDeleteLead() {
   });
 }
 
+export function useBulkDeleteLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (leadIds: string[]) => (await api.post('/leads/bulk-delete', { leadIds })).data,
+    onMutate: async (leadIds) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const ids = new Set(leadIds);
+      const snapshots = qc.getQueriesData<{ data: Lead[] }>({ queryKey: ['leads'] });
+      qc.setQueriesData<{ data: Lead[] }>({ queryKey: ['leads'] }, (old) => {
+        if (!old?.data) return old;
+        return { ...old, data: old.data.filter((l) => !ids.has(l._id)) };
+      });
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+    },
+  });
+}
+
 export interface PhoneOutcomeVars {
   id: string;
   phone: 'phone1' | 'phone2';

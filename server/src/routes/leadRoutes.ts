@@ -8,6 +8,7 @@ import {
   addRemarkSchema,
   assignLeadSchema,
   bulkAssignSchema,
+  bulkDeleteSchema,
   createLeadSchema,
   followUpSchema,
   phoneOutcomeSchema,
@@ -26,6 +27,7 @@ router.get('/export', ctrl.exportLeads);
 router.post('/', requireRole('superadmin'), validate(createLeadSchema), ctrl.createLead);
 router.post('/import', requireRole('superadmin'), uploadSpreadsheet, ctrl.importLeadsHandler);
 router.patch('/bulk-assign', requireRole('superadmin'), validate(bulkAssignSchema), ctrl.bulkAssignLeads);
+router.post('/bulk-delete', requireRole('superadmin'), validate(bulkDeleteSchema), ctrl.bulkDeleteLeads);
 router.patch('/:id/assign', requireRole('superadmin'), validate(assignLeadSchema), ctrl.assignLead);
 router.delete('/:id', requireRole('superadmin'), ctrl.deleteLead);
 
