@@ -38,16 +38,20 @@ const DEFAULT_WIDTHS: Record<string, number> = {
   title: 150,
   company: 150,
   location: 170,
-  phone: 130,
-  altphone: 130,
   email: 210,
   priority: 100,
   assigned: 150,
-  outcome: 150,
+  phone1: 130,
+  callstatus1: 145,
+  leadstatus1: 140,
+  remark1: 200,
+  phone2: 130,
+  callstatus2: 145,
+  leadstatus2: 140,
+  remark2: 200,
   lastContacted: 120,
   followup: 200,
   added: 110,
-  remark: 240,
 };
 
 interface Props {
@@ -134,6 +138,107 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
   );
 }
 
+/* --------------------------- per-phone cell inputs ------------------------- */
+
+/** Phone number with copy/call/WhatsApp actions, or a dash when empty. */
+function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+  return num ? <PhoneActions phone={num} /> : <span className="text-slate-300">—</span>;
+}
+
+/** Inline call-status dropdown for one phone (connected / not connected / voice mail / incorrect no). */
+function CallStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+  const update = useUpdatePhoneOutcome();
+  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+  const value = (slot?.callStatus ?? 'pending') as PhoneCallStatus;
+  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  return (
+    <select
+      value={value}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) =>
+        update.mutate(
+          { id: lead._id, phone, callStatus: e.target.value as PhoneCallStatus },
+          { onError: (err) => toast.error(apiError(err)) }
+        )
+      }
+      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 ${PHONE_CALL_STATUS_COLORS[value]}`}
+    >
+      <option value="pending">Not Called</option>
+      <option value="connected">Connected</option>
+      <option value="not_connected">Not Connected</option>
+      <option value="voicemail">Voice Mail</option>
+      <option value="incorrect_no">Incorrect No</option>
+    </select>
+  );
+}
+
+/** Inline lead-outcome dropdown for one phone (interested / not interested). */
+function LeadStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+  const update = useUpdatePhoneOutcome();
+  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+  const value = (slot?.leadOutcome ?? 'none') as PhoneLeadOutcome;
+  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  return (
+    <select
+      value={value}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) =>
+        update.mutate(
+          { id: lead._id, phone, leadOutcome: e.target.value as PhoneLeadOutcome },
+          { onError: (err) => toast.error(apiError(err)) }
+        )
+      }
+      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 ${PHONE_LEAD_OUTCOME_COLORS[value]}`}
+    >
+      <option value="none">—</option>
+      <option value="interested">Interested</option>
+      <option value="not_interested">Not Interested</option>
+    </select>
+  );
+}
+
+/** Inline remark input scoped to one phone, showing the latest phone-specific remark. */
+function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+  const [text, setText] = useState('');
+  const update = useUpdatePhoneOutcome();
+  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+  const phoneRemarks = (lead.remarks ?? []).filter((r) => r.phone === phone || (phone === 'phone1' && !r.phone));
+  const last = phoneRemarks[phoneRemarks.length - 1];
+
+  function submit() {
+    const t = text.trim();
+    if (!t) return;
+    setText('');
+    update.mutate({ id: lead._id, phone, remark: t }, { onError: (e) => toast.error(apiError(e)) });
+  }
+
+  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="Remark…"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+        />
+        <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
+          <Send size={13} />
+        </button>
+      </div>
+      {last && (
+        <p className="mt-0.5 truncate text-[11px] text-slate-400" title={last.text}>
+          {phoneRemarks.length}× · {last.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ----------------------------- column registry ---------------------------- */
 
 interface CellCtx {
@@ -171,8 +276,6 @@ const COLUMNS: ColumnDef[] = [
   { id: 'title', label: 'Title', muted: true, cell: (l) => <span className="block truncate" title={l.title}>{l.title || '—'}</span> },
   { id: 'company', label: 'Company', sortField: 'company', muted: true, cell: (l) => <span className="block truncate" title={l.company}>{l.company || '—'}</span> },
   { id: 'location', label: 'Location', sortField: 'country', muted: true, cell: (l) => <span className="block truncate" title={location(l)}>{location(l) || '—'}</span> },
-  { id: 'phone', label: 'Phone', cell: (l) => <PhoneActions phone={l.phone} /> },
-  { id: 'altphone', label: 'Alt Phone', cell: (l) => (l.altPhone ? <PhoneActions phone={l.altPhone} /> : <span className="text-slate-300">—</span>) },
   {
     id: 'email',
     label: 'Email',
@@ -199,11 +302,17 @@ const COLUMNS: ColumnDef[] = [
         (l.assignedTo as User | undefined)?.name ?? <span className="text-slate-300">—</span>
       ),
   },
-  { id: 'outcome', label: 'Outcome', sortField: 'callStatus', cell: (l) => <PhoneSummaryBadges lead={l} /> },
+  { id: 'phone1', label: 'Phone 1', cell: (l) => <PhoneNumberCell lead={l} phone="phone1" /> },
+  { id: 'callstatus1', label: 'Call Status 1', cell: (l) => <CallStatusCell lead={l} phone="phone1" /> },
+  { id: 'leadstatus1', label: 'Lead Status 1', cell: (l) => <LeadStatusCell lead={l} phone="phone1" /> },
+  { id: 'remark1', label: 'Remark 1', cell: (l) => <PhoneRemarkCell lead={l} phone="phone1" /> },
+  { id: 'phone2', label: 'Phone 2', cell: (l) => <PhoneNumberCell lead={l} phone="phone2" /> },
+  { id: 'callstatus2', label: 'Call Status 2', cell: (l) => <CallStatusCell lead={l} phone="phone2" /> },
+  { id: 'leadstatus2', label: 'Lead Status 2', cell: (l) => <LeadStatusCell lead={l} phone="phone2" /> },
+  { id: 'remark2', label: 'Remark 2', cell: (l) => <PhoneRemarkCell lead={l} phone="phone2" /> },
   { id: 'lastContacted', label: 'Last Contacted', sortField: 'lastContactedAt', muted: true, cell: (l) => (l.lastContactedAt ? fmtDate(l.lastContactedAt) : '—') },
   { id: 'followup', label: 'Follow-up', cell: (l) => <FollowUpCell lead={l} /> },
   { id: 'added', label: 'Added', sortField: 'createdAt', muted: true, cell: (l) => fmtDate(l.createdAt) },
-  { id: 'remark', label: 'Remark', cell: (l) => <RemarkCell lead={l} /> },
 ];
 
 const COLUMN_MAP: Record<string, ColumnDef> = Object.fromEntries(COLUMNS.map((c) => [c.id, c]));
