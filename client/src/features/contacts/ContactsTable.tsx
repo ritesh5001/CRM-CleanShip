@@ -435,9 +435,24 @@ export function ContactsTable({
     .map((id) => COLUMN_MAP[id])
     .filter((c): c is ColumnDef => !!c && (!c.adminOnly || isAdmin) && !hiddenCols.includes(c.id));
 
+  // Keep Name as the first data column so it can stay frozen (sticky) on the left.
+  const nameIdx = visibleCols.findIndex((c) => c.id === 'name');
+  if (nameIdx > 0) visibleCols.unshift(visibleCols.splice(nameIdx, 1)[0]);
+
   const renderedColIds = [...(selectable ? ['select'] : []), 'expand', ...visibleCols.map((c) => c.id)];
   const widthOf = (id: string) => widths[id] ?? DEFAULT_WIDTHS[id] ?? 120;
   const totalWidth = renderedColIds.reduce((s, id) => s + widthOf(id), 0);
+
+  // Left offsets for the frozen (sticky) leading columns: select · expand · name.
+  const PINNED_IDS = ['select', 'expand', 'name'];
+  const pinnedLeft: Record<string, number> = {};
+  {
+    let x = 0;
+    for (const cid of renderedColIds) {
+      if (PINNED_IDS.includes(cid)) pinnedLeft[cid] = x;
+      x += widthOf(cid);
+    }
+  }
 
   function startResize(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -485,9 +500,14 @@ export function ContactsTable({
   );
 
   // Header cell for a draggable, resizable, sortable data column.
-  const ThData = ({ col }: { col: ColumnDef }) => (
+  const ThData = ({ col }: { col: ColumnDef }) => {
+    const pinned = col.id === 'name';
+    return (
     <th
-      className={`relative select-none px-2 py-2 ${overId === col.id ? 'bg-brand-50' : ''}`}
+      style={pinned ? { position: 'sticky', left: pinnedLeft.name } : undefined}
+      className={`relative select-none px-2 py-2 ${overId === col.id ? 'bg-brand-50' : ''} ${
+        pinned ? 'z-30 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700' : ''
+      }`}
       onDragOver={(e) => {
         if (dragId) {
           e.preventDefault();
@@ -514,7 +534,8 @@ export function ContactsTable({
         className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize hover:bg-brand-300"
       />
     </th>
-  );
+    );
+  };
 
   return (
     <>
@@ -529,11 +550,17 @@ export function ContactsTable({
           <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[0_1px_0_0_#334155]">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
               {selectable && (
-                <th className="relative select-none px-2 py-2">
+                <th
+                  style={{ position: 'sticky', left: pinnedLeft.select }}
+                  className="relative z-30 select-none bg-white px-2 py-2 dark:bg-slate-900"
+                >
                   <input type="checkbox" className="h-4 w-4" checked={!!allChecked} onChange={onToggleAll} />
                 </th>
               )}
-              <th className="relative select-none px-2 py-2" />
+              <th
+                style={{ position: 'sticky', left: pinnedLeft.expand }}
+                className="relative z-30 select-none bg-white px-2 py-2 dark:bg-slate-900"
+              />
               {visibleCols.map((col) => (
                 <ThData key={col.id} col={col} />
               ))}
@@ -544,6 +571,7 @@ export function ContactsTable({
               <Row
                 key={lead._id}
                 columns={visibleCols}
+                pinnedLeft={pinnedLeft}
                 lead={lead}
                 isAdmin={isAdmin}
                 role={role}
@@ -885,6 +913,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 function Row({
   lead,
   columns,
+  pinnedLeft,
   isAdmin,
   pad,
   selectable,
@@ -895,6 +924,7 @@ function Row({
 }: {
   lead: Lead;
   columns: ColumnDef[];
+  pinnedLeft: Record<string, number>;
   isAdmin: boolean;
   role: Role;
   pad: string;
@@ -908,24 +938,37 @@ function Row({
   const muted = 'text-slate-500 dark:text-slate-400';
   const ctx: CellCtx = { isAdmin, telecallers, onAssign };
 
+  // Frozen-left cells share an opaque background that follows the row hover state.
+  const stickyBg =
+    'bg-white group-hover:bg-slate-50 dark:bg-slate-900 dark:group-hover:bg-slate-800';
+
   return (
     <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/40">
+      <tr className="group border-b border-slate-100 hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/40">
         {selectable && (
-          <td className={pad}>
+          <td style={{ position: 'sticky', left: pinnedLeft.select, zIndex: 10 }} className={`${pad} ${stickyBg}`}>
             <input type="checkbox" className="h-4 w-4" checked={selected} onChange={() => onToggle(lead._id)} />
           </td>
         )}
-        <td className={pad}>
-          <button onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-slate-600">
+        <td style={{ position: 'sticky', left: pinnedLeft.expand, zIndex: 10 }} className={`${pad} ${stickyBg}`}>
+          <button onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         </td>
-        {columns.map((col) => (
-          <td key={col.id} className={col.muted ? `${pad} ${muted}` : pad}>
-            {col.cell(lead, ctx)}
-          </td>
-        ))}
+        {columns.map((col) => {
+          const pinned = col.id === 'name';
+          return (
+            <td
+              key={col.id}
+              style={pinned ? { position: 'sticky', left: pinnedLeft.name, zIndex: 10 } : undefined}
+              className={`${col.muted ? `${pad} ${muted}` : pad} ${
+                pinned ? `${stickyBg} border-r border-slate-200 dark:border-slate-700` : ''
+              }`}
+            >
+              {col.cell(lead, ctx)}
+            </td>
+          );
+        })}
       </tr>
       {open && (
         <tr>
