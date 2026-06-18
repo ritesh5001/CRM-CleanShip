@@ -98,6 +98,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
 
   const leads = data?.data ?? [];
   const total = data?.pagination.total ?? 0;
+  const totalPages = data?.pagination.totalPages ?? 1;
   const selectable = isAdmin && isContacts;
 
   const { data: tcData } = useTelecallers({ isActive: 'true', limit: 100 }, { enabled: isAdmin });
@@ -105,9 +106,8 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   const assign = useAssignLead();
   const bulkAssign = useBulkAssignLeads();
 
-  function resetPage() {
-    setPage(1);
-  }
+  function resetPage() { setPage(1); }
+
   function handleAssign(leadId: string, telecallerId: string, name: string) {
     assign.mutate(
       { id: leadId, assignedTo: telecallerId, assignedToName: name },
@@ -120,20 +120,14 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
     bulkAssign.mutate(
       { leadIds: selected, assignedTo: telecallerId, assignedToName: t.name },
       {
-        onSuccess: () => {
-          toast.success(`Assigned ${selected.length} to ${t.name}`);
-          setSelected([]);
-        },
+        onSuccess: () => { toast.success(`Assigned ${selected.length} to ${t.name}`); setSelected([]); },
         onError: (err) => toast.error(apiError(err)),
       }
     );
   }
   function onSort(field: string) {
     if (sortBy === field) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(field);
-      setOrder('asc');
-    }
+    else { setSortBy(field); setOrder('asc'); }
     resetPage();
   }
   function setCallChip(v: string) {
@@ -142,12 +136,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
     resetPage();
   }
   function clearFilters() {
-    setSearch('');
-    setStatus('');
-    setCallStatus('');
-    setAssignedTo('');
-    setQualifiedChip(false);
-    resetPage();
+    setSearch(''); setStatus(''); setCallStatus(''); setAssignedTo(''); setQualifiedChip(false); resetPage();
   }
   async function handleExport() {
     setExporting(true);
@@ -161,7 +150,6 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
       setExporting(false);
     }
   }
-
   function toggle(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
@@ -183,170 +171,178 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
     : [];
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">
-            {title} <span className="text-sm font-normal text-slate-400">({total})</span>
-          </h1>
-          <p className="text-sm text-slate-400">
-            {isContacts
-              ? isAdmin
-                ? 'Assign, call, remark, sort & export — all inline.'
-                : 'Your contacts. Set outcomes and remarks right in the row.'
-              : 'Interested contacts that converted into leads.'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={handleExport} loading={exporting}>
-            <Download size={16} /> Export
-          </Button>
-          {selectable && (
-            <>
-              <Button variant="secondary" onClick={() => setImportOpen(true)}>
-                <Upload size={16} /> Import
-              </Button>
-              <Button onClick={() => setFormOpen(true)}>
-                <Plus size={16} /> Add
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+    <div className="flex h-full flex-col gap-2">
 
-      {/* Filters toggle (collapsible) */}
-      <div className="flex items-center gap-2">
+      {/* ── Single compact top bar ── */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+
+        {/* Title + count */}
+        <h1 className="shrink-0 text-base font-bold text-slate-800">
+          {title} <span className="text-xs font-normal text-slate-400">({total})</span>
+        </h1>
+
+        {/* Stat chips — always visible */}
+        {isContacts && chips.map((c) => (
+          <button
+            key={c.key}
+            onClick={c.onClick}
+            className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+              c.active
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {c.label} <span className="font-semibold">{c.value}</span>
+          </button>
+        ))}
+
+        <div className="flex-1" />
+
+        {/* Filters toggle */}
         <button
           onClick={toggleFilters}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            !filtersCollapsed
+              ? 'border-brand-500 bg-brand-50 text-brand-700'
+              : hasFilters
+              ? 'border-brand-400 bg-brand-50 text-brand-700'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
         >
-          <SlidersHorizontal size={14} /> Filters
-          {filtersCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          <SlidersHorizontal size={13} />
+          Filters
+          {filtersCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+          {filtersCollapsed && hasFilters && (
+            <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-brand-500" />
+          )}
         </button>
-        {filtersCollapsed && hasFilters && <span className="text-xs text-brand-600">filters active</span>}
+
+        {/* Action buttons */}
+        <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>
+          <Download size={14} /> Export
+        </Button>
+        {selectable && (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>
+              <Upload size={14} /> Import
+            </Button>
+            <Button size="sm" onClick={() => setFormOpen(true)}>
+              <Plus size={14} /> Add
+            </Button>
+          </>
+        )}
+
+        {/* Pagination — inline in the top bar */}
+        {totalPages > 1 && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              Previous
+            </Button>
+            <span className="px-1 text-xs text-slate-500">
+              {data?.pagination.page ?? page} / {totalPages}
+            </span>
+            <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* ── Collapsible filter panel ── */}
       {!filtersCollapsed && (
-        <>
-      {/* Stat chips */}
-      {isContacts && chips.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <button
-              key={c.key}
-              onClick={c.onClick}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                c.active ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {c.label} <span className="font-bold">{c.value}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Top filter toolbar */}
-      <div className="space-y-2">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-          <Input
-            className="pl-9"
-            placeholder="Search name, phone, email, company…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              resetPage();
-            }}
-          />
-        </div>
-
-        {/* Aligned grid of filter controls */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          <Field label="Status">
-            <Select value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }}>
-              <option value="">All statuses</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Call">
-            <Select value={callStatus} onChange={(e) => { setQualifiedChip(false); setCallStatus(e.target.value); resetPage(); }}>
-              <option value="">All calls</option>
-              <option value="pending">Not Called</option>
-              <option value="done">Call Done</option>
-              <option value="not_done">Not Done</option>
-            </Select>
-          </Field>
-          {isAdmin && (
-            <Field label="Assignee">
-              <Select value={assignedTo} onChange={(e) => { setAssignedTo(e.target.value); resetPage(); }}>
-                <option value="">All assignees</option>
-                <option value="unassigned">Unassigned</option>
-                {telecallers.map((t) => (
-                  <option key={t._id} value={t._id}>{t.name}</option>
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={15} />
+            <Input
+              className="pl-9"
+              placeholder="Search name, phone, email, company..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); resetPage(); }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
+            <Field label="Status">
+              <Select value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }}>
+                <option value="">All statuses</option>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
                 ))}
               </Select>
             </Field>
-          )}
-          <Field label="Sort by">
-            <Select value={sortBy} onChange={(e) => { setSortBy(e.target.value); resetPage(); }}>
-              {SORT_FIELDS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Order">
-            <button
-              onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-            >
-              {order === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
-            </button>
-          </Field>
-          <Field label="Rows">
-            <Select value={String(limit)} onChange={(e) => { setLimit(Number(e.target.value)); resetPage(); }}>
-              <option value="50">50 / page</option>
-              <option value="100">100 / page</option>
-              <option value="200">200 / page</option>
-            </Select>
-          </Field>
-          <Field label="Density">
-            <div className="flex w-full overflow-hidden rounded-lg border border-slate-300">
-              <button
-                onClick={() => setDensity('comfortable')}
-                className={`flex-1 py-2 text-xs ${density === 'comfortable' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
-              >
-                Cozy
-              </button>
-              <button
-                onClick={() => setDensity('compact')}
-                className={`flex-1 py-2 text-xs ${density === 'compact' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
-              >
-                Compact
-              </button>
-            </div>
-          </Field>
-          {hasFilters && (
-            <Field label=" ">
-              <Button variant="ghost" className="w-full" onClick={clearFilters}>
-                <X size={14} /> Clear filters
-              </Button>
+            <Field label="Call">
+              <Select value={callStatus} onChange={(e) => { setQualifiedChip(false); setCallStatus(e.target.value); resetPage(); }}>
+                <option value="">All calls</option>
+                <option value="pending">Not Called</option>
+                <option value="done">Call Done</option>
+                <option value="not_done">Not Done</option>
+              </Select>
             </Field>
-          )}
+            {isAdmin && (
+              <Field label="Assignee">
+                <Select value={assignedTo} onChange={(e) => { setAssignedTo(e.target.value); resetPage(); }}>
+                  <option value="">All assignees</option>
+                  <option value="unassigned">Unassigned</option>
+                  {telecallers.map((t) => (
+                    <option key={t._id} value={t._id}>{t.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+            <Field label="Sort by">
+              <Select value={sortBy} onChange={(e) => { setSortBy(e.target.value); resetPage(); }}>
+                {SORT_FIELDS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Order">
+              <button
+                onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                {order === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+              </button>
+            </Field>
+            <Field label="Rows">
+              <Select value={String(limit)} onChange={(e) => { setLimit(Number(e.target.value)); resetPage(); }}>
+                <option value="50">50 / page</option>
+                <option value="100">100 / page</option>
+                <option value="200">200 / page</option>
+              </Select>
+            </Field>
+            <Field label="Density">
+              <div className="flex w-full overflow-hidden rounded-lg border border-slate-300">
+                <button
+                  onClick={() => setDensity('comfortable')}
+                  className={`flex-1 py-2 text-xs ${density === 'comfortable' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
+                >
+                  Cozy
+                </button>
+                <button
+                  onClick={() => setDensity('compact')}
+                  className={`flex-1 py-2 text-xs ${density === 'compact' ? 'bg-brand-50 text-brand-700' : 'text-slate-500'}`}
+                >
+                  Compact
+                </button>
+              </div>
+            </Field>
+            {hasFilters && (
+              <Field label=" ">
+                <Button variant="ghost" className="w-full" onClick={clearFilters}>
+                  <X size={14} /> Clear filters
+                </Button>
+              </Field>
+            )}
+          </div>
         </div>
-      </div>
-        </>
       )}
 
-      {/* Inline bulk-assign bar */}
+      {/* Bulk-assign bar */}
       {selectable && selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 px-4 py-2 text-sm">
           <span className="font-medium">{selected.length} selected</span>
           <Select className="w-52" value="" onChange={(e) => handleBulkAssign(e.target.value)}>
-            <option value="">Assign selected to…</option>
+            <option value="">Assign selected to...</option>
             {telecallers.map((t) => (
               <option key={t._id} value={t._id}>{t.name}</option>
             ))}
@@ -355,7 +351,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
         </div>
       )}
 
-      {/* Scrollable table */}
+      {/* Table — takes all remaining vertical space */}
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-white">
         <ContactsTable
           leads={leads}
@@ -376,25 +372,10 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
               ? isAdmin
                 ? 'Import or add contacts to begin.'
                 : 'No contacts assigned to you yet.'
-              : 'No leads yet — set a call outcome to “Interested” to create one.'
+              : 'No leads yet — set a call outcome to "Interested" to create one.'
           }
         />
       </div>
-
-      {/* Pagination */}
-      {data && data.pagination.totalPages > 1 && (
-        <div className="flex shrink-0 items-center justify-center gap-2">
-          <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <span className="text-sm text-slate-500">
-            Page {data.pagination.page} of {data.pagination.totalPages}
-          </span>
-          <Button size="sm" variant="secondary" disabled={page >= data.pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
-        </div>
-      )}
 
       {isAdmin && (
         <>
