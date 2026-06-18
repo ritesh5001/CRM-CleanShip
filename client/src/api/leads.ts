@@ -219,6 +219,13 @@ export function useUpdatePhoneOutcome() {
 
         const next: Lead = { ...l, [slotKey]: updatedSlot, callStatus: newCallStatus };
 
+        // Mirror the server: a connecting call seeds a follow-up 2 weeks out if none exists.
+        if (vars.callStatus === 'connected' && !l.nextFollowUpAt) {
+          const followUpAt = new Date();
+          followUpAt.setDate(followUpAt.getDate() + 14);
+          next.nextFollowUpAt = followUpAt.toISOString();
+        }
+
         const p1lo = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.leadOutcome ?? 'none';
         const p2lo = (vars.phone === 'phone2' ? updatedSlot : l.phone2Outcome)?.leadOutcome ?? 'none';
         if (p1lo === 'interested' || p2lo === 'interested') {
@@ -252,6 +259,7 @@ export function useUpdatePhoneOutcome() {
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['lead', v.id] });
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
+      qc.invalidateQueries({ queryKey: ['followups'] });
     },
   });
 }

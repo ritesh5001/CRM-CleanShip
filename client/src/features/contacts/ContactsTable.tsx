@@ -27,7 +27,7 @@ import {
   PHONE_LEAD_OUTCOME_LABELS,
   PRIORITY_COLORS,
 } from '@/lib/constants';
-import { cleanPhone, fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
+import { cleanPhone, fmtDate, fmtDateTime, telLink, toDateInput, whatsappLink } from '@/lib/format';
 import { useUiStore } from '@/store/ui';
 import type { Density, Lead, PhoneCallStatus, PhoneLeadOutcome, Role, User } from '@/types';
 
@@ -93,7 +93,8 @@ function FollowUpCell({ lead }: { lead: Lead }) {
   return (
     <div onClick={(e) => e.stopPropagation()} className="space-y-0.5">
       <input
-        type="datetime-local"
+        type="date"
+        value={toDateInput(lead.nextFollowUpAt)}
         onChange={(e) =>
           e.target.value &&
           schedule.mutate(

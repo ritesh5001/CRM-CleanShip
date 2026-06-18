@@ -295,7 +295,22 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
 
   if (callStatus) {
     (slot as { callStatus: PhoneCallStatus }).callStatus = callStatus;
-    if (callStatus === 'connected') lead.lastContactedAt = new Date();
+    if (callStatus === 'connected') {
+      lead.lastContactedAt = new Date();
+      // Default a follow-up to 2 weeks out when a call connects and none is set yet.
+      if (!lead.nextFollowUpAt) {
+        const followUpAt = new Date();
+        followUpAt.setDate(followUpAt.getDate() + 14);
+        lead.nextFollowUpAt = followUpAt;
+        const telecaller = idOf(lead.assignedTo) || req.user!.id;
+        await FollowUp.create({
+          lead: lead._id,
+          telecaller,
+          scheduledAt: followUpAt,
+          notes: 'Auto-scheduled 2 weeks after connected call',
+        });
+      }
+    }
   }
   if (leadOutcome) {
     (slot as { leadOutcome: PhoneLeadOutcome }).leadOutcome = leadOutcome;

@@ -15,6 +15,12 @@ export function fmtRelative(d?: string | Date | null) {
   return formatDistanceToNow(new Date(d), { addSuffix: true });
 }
 
+/** Formats a date to local `yyyy-MM-dd` for a <input type="date"> value. */
+export function toDateInput(d?: string | Date | null) {
+  if (!d) return '';
+  return format(new Date(d), 'yyyy-MM-dd');
+}
+
 export function isOverdue(d?: string | Date | null) {
   if (!d) return false;
   return isPast(new Date(d)) && !isToday(new Date(d));
