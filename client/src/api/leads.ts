@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { patchLeadInLists } from './calls';
 import { useAuthStore } from '@/store/auth';
-import type { Lead, Paginated } from '@/types';
+import type { Lead, Paginated, PhoneCallStatus, PhoneLeadOutcome } from '@/types';
 
 export interface LeadQuery {
   search?: string;
@@ -181,6 +181,78 @@ export function useDeleteLead() {
   return useMutation({
     mutationFn: async (id: string) => (await api.delete(`/leads/${id}`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+  });
+}
+
+export interface PhoneOutcomeVars {
+  id: string;
+  phone: 'phone1' | 'phone2';
+  callStatus?: PhoneCallStatus;
+  leadOutcome?: PhoneLeadOutcome;
+  remark?: string;
+}
+
+export function useUpdatePhoneOutcome() {
+  const qc = useQueryClient();
+  const user = useAuthStore.getState().user;
+
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: PhoneOutcomeVars) =>
+      (await api.patch(`/leads/${id}/phone-outcome`, payload)).data,
+
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const snapshots = patchLeadInLists(qc, vars.id, (l) => {
+        const slotKey = vars.phone === 'phone1' ? 'phone1Outcome' : 'phone2Outcome';
+        const prevSlot = l[slotKey] ?? { callStatus: 'pending' as PhoneCallStatus, leadOutcome: 'none' as PhoneLeadOutcome };
+        const updatedSlot = {
+          ...prevSlot,
+          ...(vars.callStatus ? { callStatus: vars.callStatus } : {}),
+          ...(vars.leadOutcome ? { leadOutcome: vars.leadOutcome } : {}),
+        };
+
+        const p1cs = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.callStatus ?? 'pending';
+        const p2cs = (vars.phone === 'phone2' ? updatedSlot : l.phone2Outcome)?.callStatus ?? 'pending';
+        const newCallStatus =
+          p1cs === 'connected' || p2cs === 'connected' ? 'done' :
+          p1cs !== 'pending' || p2cs !== 'pending' ? 'not_done' : 'pending';
+
+        const next: Lead = { ...l, [slotKey]: updatedSlot, callStatus: newCallStatus };
+
+        const p1lo = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.leadOutcome ?? 'none';
+        const p2lo = (vars.phone === 'phone2' ? updatedSlot : l.phone2Outcome)?.leadOutcome ?? 'none';
+        if (p1lo === 'interested' || p2lo === 'interested') {
+          next.status = 'interested';
+          next.qualified = true;
+        } else if (p1lo === 'not_interested' || p2lo === 'not_interested') {
+          next.status = 'not_interested';
+          next.qualified = false;
+        }
+
+        if (vars.remark?.trim()) {
+          next.remarks = [
+            ...(l.remarks ?? []),
+            {
+              text: vars.remark,
+              byName: user?.name,
+              byRole: user?.role,
+              phone: vars.phone,
+              createdAt: new Date().toISOString(),
+            },
+          ];
+        }
+        return next;
+      });
+      return { snapshots };
+    },
+
+    onError: (_e, _v, ctx) => ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data)),
+
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead', v.id] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+    },
   });
 }
 

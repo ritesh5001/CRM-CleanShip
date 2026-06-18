@@ -14,20 +14,19 @@ import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
 import { Button } from '@/components/ui/Button';
 import { apiError } from '@/api/client';
-import { useLogCall } from '@/api/calls';
-import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead } from '@/api/leads';
+import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead, useUpdatePhoneOutcome } from '@/api/leads';
 import {
-  CALL_STATUS_COLORS,
-  CALL_STATUS_LABELS,
-  DISPOSITION_LABELS,
-  DISPOSITIONS,
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
+  PHONE_CALL_STATUS_COLORS,
+  PHONE_CALL_STATUS_LABELS,
+  PHONE_LEAD_OUTCOME_COLORS,
+  PHONE_LEAD_OUTCOME_LABELS,
   PRIORITY_COLORS,
 } from '@/lib/constants';
 import { cleanPhone, fmtDate, fmtDateTime, telLink, whatsappLink } from '@/lib/format';
 import { useUiStore } from '@/store/ui';
-import type { CallStatus, Density, Disposition, Lead, Role, User } from '@/types';
+import type { Density, Lead, PhoneCallStatus, PhoneLeadOutcome, Role, User } from '@/types';
 
 const DEFAULT_WIDTHS: Record<string, number> = {
   select: 36,
@@ -65,8 +64,9 @@ interface Props {
   emptyHint?: string;
 }
 
-const NOT_DONE = '__not_done__';
 const PRIORITIES = ['low', 'medium', 'high'] as const;
+const PHONE_CALL_OPTIONS: PhoneCallStatus[] = ['connected', 'not_connected', 'voicemail', 'incorrect_no'];
+const PHONE_LEAD_OPTIONS: PhoneLeadOutcome[] = ['interested', 'not_interested'];
 
 function location(l: Lead) {
   return [l.city, l.state, l.country].filter(Boolean).join(', ');
@@ -130,11 +130,6 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
     </div>
   );
 }
-function outcomeValue(l: Lead) {
-  if (l.callStatus === 'done') return l.lastOutcome ?? '';
-  if (l.callStatus === 'not_done') return NOT_DONE;
-  return '';
-}
 
 export function ContactsTable({
   leads,
@@ -153,7 +148,6 @@ export function ContactsTable({
   emptyHint,
 }: Props) {
   const isAdmin = role === 'superadmin';
-  const logCall = useLogCall();
   const pad = density === 'compact' ? 'px-2 py-1' : 'px-2 py-2.5';
 
   // Resizable columns (widths persisted in the UI store).
@@ -210,18 +204,6 @@ export function ContactsTable({
       )}
     </th>
   );
-
-  function handleOutcome(lead: Lead, value: string) {
-    if (!value) return;
-    const vars =
-      value === NOT_DONE
-        ? { lead: lead._id, callStatus: 'not_done' as CallStatus }
-        : { lead: lead._id, callStatus: 'done' as CallStatus, disposition: value as Disposition };
-    logCall.mutate(vars, {
-      onSuccess: () => toast.success(value === NOT_DONE ? 'Marked not done' : 'Call logged'),
-      onError: (e) => toast.error(apiError(e)),
-    });
-  }
 
   if (isLoading) return <Spinner />;
   if (!leads.length) return <EmptyState title="Nothing here yet" hint={emptyHint} />;
@@ -282,7 +264,6 @@ export function ContactsTable({
                 onToggle={onToggle}
                 telecallers={telecallers}
                 onAssign={onAssign}
-                onOutcome={handleOutcome}
               />
             ))}
           </tbody>
@@ -302,7 +283,6 @@ export function ContactsTable({
             onToggle={onToggle}
             telecallers={telecallers}
             onAssign={onAssign}
-            onOutcome={handleOutcome}
           />
         ))}
       </div>
@@ -367,39 +347,140 @@ function PriorityCell({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
   );
 }
 
-function OutcomeControl({
+/** Compact read-only call-status badges shown in the table's Outcome column. */
+function PhoneSummaryBadges({ lead }: { lead: Lead }) {
+  const p1 = lead.phone1Outcome?.callStatus ?? 'pending';
+  const p2 = lead.phone2Outcome?.callStatus ?? 'pending';
+  return (
+    <div className="space-y-0.5">
+      <Badge className={`${PHONE_CALL_STATUS_COLORS[p1]} text-[10px]`}>
+        P1: {PHONE_CALL_STATUS_LABELS[p1]}
+      </Badge>
+      {lead.altPhone && (
+        <Badge className={`${PHONE_CALL_STATUS_COLORS[p2]} text-[10px]`}>
+          P2: {PHONE_CALL_STATUS_LABELS[p2]}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/** Per-phone call tracking panel shown inside the expanded row. */
+function PhoneOutcomePanel({
   lead,
+  phone,
   isAdmin,
-  onOutcome,
 }: {
   lead: Lead;
+  phone: 'phone1' | 'phone2';
   isAdmin: boolean;
-  onOutcome: (lead: Lead, v: string) => void;
 }) {
+  const phoneNumber = phone === 'phone1' ? lead.phone : lead.altPhone!;
+  const slot = (phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome) ?? {
+    callStatus: 'pending' as PhoneCallStatus,
+    leadOutcome: 'none' as PhoneLeadOutcome,
+  };
+  const [remarkText, setRemarkText] = useState('');
+  const update = useUpdatePhoneOutcome();
+
+  const phoneRemarks = (lead.remarks ?? []).filter(
+    (r) => r.phone === phone || (phone === 'phone1' && !r.phone),
+  );
+
+  function setCallStatus(cs: PhoneCallStatus) {
+    update.mutate({ id: lead._id, phone, callStatus: cs }, { onError: (e) => toast.error(apiError(e)) });
+  }
+  function setLeadOutcome(lo: PhoneLeadOutcome) {
+    update.mutate({ id: lead._id, phone, leadOutcome: lo }, { onError: (e) => toast.error(apiError(e)) });
+  }
+  function submitRemark() {
+    const t = remarkText.trim();
+    if (!t) return;
+    setRemarkText('');
+    update.mutate({ id: lead._id, phone, remark: t }, { onError: (e) => toast.error(apiError(e)) });
+  }
+
+  const label = phone === 'phone1' ? 'Phone 1' : 'Phone 2';
+
   if (isAdmin) {
     return (
-      <Badge className={CALL_STATUS_COLORS[(lead.callStatus ?? 'pending') as CallStatus]}>
-        {lead.callStatus === 'done' && lead.lastOutcome
-          ? DISPOSITION_LABELS[lead.lastOutcome as Disposition] ?? 'Done'
-          : CALL_STATUS_LABELS[(lead.callStatus ?? 'pending') as CallStatus]}
-      </Badge>
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <PhoneActions phone={phoneNumber} />
+          <Badge className={PHONE_CALL_STATUS_COLORS[slot.callStatus]}>
+            {PHONE_CALL_STATUS_LABELS[slot.callStatus]}
+          </Badge>
+          {slot.leadOutcome !== 'none' && (
+            <Badge className={PHONE_LEAD_OUTCOME_COLORS[slot.leadOutcome]}>
+              {PHONE_LEAD_OUTCOME_LABELS[slot.leadOutcome]}
+            </Badge>
+          )}
+        </div>
+        {phoneRemarks.slice(-2).reverse().map((r, i) => (
+          <div key={r._id ?? i} className="rounded bg-slate-50 p-1.5 text-xs text-slate-600">
+            {r.text}
+            <span className="ml-1 text-[10px] text-slate-400">{fmtDate(r.createdAt)}</span>
+          </div>
+        ))}
+      </div>
     );
   }
+
   return (
-    <select
-      value={outcomeValue(lead)}
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => onOutcome(lead, e.target.value)}
-      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
-    >
-      <option value="">— Outcome —</option>
-      {DISPOSITIONS.map((d) => (
-        <option key={d} value={d}>
-          {DISPOSITION_LABELS[d]}
-        </option>
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <PhoneActions phone={phoneNumber} />
+      <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {PHONE_CALL_OPTIONS.map((cs) => (
+          <button
+            key={cs}
+            onClick={() => setCallStatus(cs)}
+            disabled={update.isPending}
+            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+              slot.callStatus === cs
+                ? `${PHONE_CALL_STATUS_COLORS[cs]} ring-1 ring-current`
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            {PHONE_CALL_STATUS_LABELS[cs]}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {PHONE_LEAD_OPTIONS.map((lo) => (
+          <button
+            key={lo}
+            onClick={() => setLeadOutcome(lo)}
+            disabled={update.isPending}
+            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+              slot.leadOutcome === lo
+                ? `${PHONE_LEAD_OUTCOME_COLORS[lo]} ring-1 ring-current`
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            {PHONE_LEAD_OUTCOME_LABELS[lo]}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <input
+          value={remarkText}
+          onChange={(e) => setRemarkText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submitRemark()}
+          placeholder={`Remark for ${label}…`}
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+        />
+        <button onClick={submitRemark} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Send">
+          <Send size={13} />
+        </button>
+      </div>
+      {phoneRemarks.slice(-2).reverse().map((r, i) => (
+        <p key={r._id ?? i} className="truncate text-[11px] text-slate-400" title={r.text}>
+          {r.text}
+        </p>
       ))}
-      <option value={NOT_DONE}>Not Done</option>
-    </select>
+    </div>
   );
 }
 
@@ -451,41 +532,50 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 lg:grid-cols-3">
-      <div className="space-y-2 text-sm">
-        {lead.email && <Detail label="Email" value={lead.email} />}
-        {lead.altPhone && <Detail label="Alt phone" value={lead.altPhone} />}
-        {loc && <Detail label="Location" value={loc} />}
-        {lead.source && <Detail label="Source" value={lead.source} />}
-        {!!lead.tags?.length && <Detail label="Tags" value={lead.tags.join(', ')} />}
+    <div className="space-y-4 bg-slate-50 p-4">
+      {/* Per-phone call tracking */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <PhoneOutcomePanel lead={lead} phone="phone1" isAdmin={isAdmin} />
+        {lead.altPhone && <PhoneOutcomePanel lead={lead} phone="phone2" isAdmin={isAdmin} />}
       </div>
-      <div className="space-y-2 text-sm">
-        {lead.lastContactedAt && <Detail label="Last contacted" value={fmtDateTime(lead.lastContactedAt)} />}
-        {lead.nextFollowUpAt && <Detail label="Next follow-up" value={fmtDateTime(lead.nextFollowUpAt)} />}
-        <Detail label="Added" value={fmtDateTime(lead.createdAt)} />
-        {isAdmin && (
-          <Button size="sm" variant="danger" onClick={onDelete}>
-            <Trash2 size={14} /> Delete contact
-          </Button>
-        )}
-      </div>
-      <div>
-        <p className="mb-1 text-xs font-semibold text-slate-500">Remarks</p>
-        <div className="max-h-48 space-y-1.5 overflow-y-auto">
-          {!lead.remarks?.length && <p className="text-xs text-slate-400">No remarks yet.</p>}
-          {(lead.remarks ?? [])
-            .slice()
-            .reverse()
-            .map((r, i) => (
-              <div key={r._id ?? i} className="rounded-lg bg-white p-2">
-                <p className="text-xs text-slate-700">{r.text}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  {r.byName || 'Unknown'}
-                  {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'User'})` : ''} ·{' '}
-                  {fmtDateTime(r.createdAt)}
-                </p>
-              </div>
-            ))}
+
+      {/* Contact details, timestamps, and full remarks timeline */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-2 text-sm">
+          {lead.email && <Detail label="Email" value={lead.email} />}
+          {loc && <Detail label="Location" value={loc} />}
+          {lead.source && <Detail label="Source" value={lead.source} />}
+          {!!lead.tags?.length && <Detail label="Tags" value={lead.tags.join(', ')} />}
+        </div>
+        <div className="space-y-2 text-sm">
+          {lead.lastContactedAt && <Detail label="Last contacted" value={fmtDateTime(lead.lastContactedAt)} />}
+          {lead.nextFollowUpAt && <Detail label="Next follow-up" value={fmtDateTime(lead.nextFollowUpAt)} />}
+          <Detail label="Added" value={fmtDateTime(lead.createdAt)} />
+          {isAdmin && (
+            <Button size="sm" variant="danger" onClick={onDelete}>
+              <Trash2 size={14} /> Delete contact
+            </Button>
+          )}
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-semibold text-slate-500">All Remarks</p>
+          <div className="max-h-48 space-y-1.5 overflow-y-auto">
+            {!lead.remarks?.length && <p className="text-xs text-slate-400">No remarks yet.</p>}
+            {(lead.remarks ?? [])
+              .slice()
+              .reverse()
+              .map((r, i) => (
+                <div key={r._id ?? i} className="rounded-lg bg-white p-2">
+                  <p className="text-xs text-slate-700">{r.text}</p>
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    {r.byName || 'Unknown'}
+                    {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'User'})` : ''}
+                    {r.phone ? ` · ${r.phone === 'phone1' ? 'Phone 1' : 'Phone 2'}` : ''} ·{' '}
+                    {fmtDateTime(r.createdAt)}
+                  </p>
+                </div>
+              ))}
+          </div>
         </div>
       </div>
     </div>
@@ -513,7 +603,6 @@ function Row({
   onToggle,
   telecallers,
   onAssign,
-  onOutcome,
 }: {
   lead: Lead;
   isAdmin: boolean;
@@ -524,7 +613,6 @@ function Row({
   onToggle: (id: string) => void;
   telecallers: User[];
   onAssign?: (id: string, tid: string, name: string) => void;
-  onOutcome: (lead: Lead, v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const muted = 'text-slate-500';
@@ -591,7 +679,7 @@ function Row({
           </td>
         )}
         <td className={pad}>
-          <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />
+          <PhoneSummaryBadges lead={lead} />
         </td>
         <td className={`${pad} ${muted}`}>{lead.lastContactedAt ? fmtDate(lead.lastContactedAt) : '—'}</td>
         <td className={pad}>
@@ -624,7 +712,6 @@ function MobileCard({
   onToggle,
   telecallers,
   onAssign,
-  onOutcome,
 }: {
   lead: Lead;
   isAdmin: boolean;
@@ -634,7 +721,6 @@ function MobileCard({
   onToggle: (id: string) => void;
   telecallers: User[];
   onAssign?: (id: string, tid: string, name: string) => void;
-  onOutcome: (lead: Lead, v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -656,7 +742,7 @@ function MobileCard({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <PhoneActions phone={lead.phone} big />
             {isAdmin && onAssign && <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />}
-            {!isAdmin && <OutcomeControl lead={lead} isAdmin={isAdmin} onOutcome={onOutcome} />}
+            <PhoneSummaryBadges lead={lead} />
             <button onClick={() => setOpen((o) => !o)} className="ml-auto text-slate-400">
               {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </button>

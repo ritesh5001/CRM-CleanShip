@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LEAD_STATUSES, LEAD_PRIORITIES } from '../models/Lead.js';
+import { LEAD_STATUSES, LEAD_PRIORITIES, PHONE_CALL_STATUSES, PHONE_LEAD_OUTCOMES } from '../models/Lead.js';
 
 export const createLeadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -53,4 +53,16 @@ export const bulkAssignSchema = z.object({
   assignedTo: z.string().min(1, 'assignedTo is required'),
 });
 
+export const phoneOutcomeSchema = z
+  .object({
+    phone: z.enum(['phone1', 'phone2']),
+    callStatus: z.enum(PHONE_CALL_STATUSES).optional(),
+    leadOutcome: z.enum(PHONE_LEAD_OUTCOMES).optional(),
+    remark: z.string().optional().default(''),
+  })
+  .refine((d) => !!d.callStatus || !!d.leadOutcome || !!d.remark, {
+    message: 'At least one of callStatus, leadOutcome, or remark is required',
+  });
+
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
+export type PhoneOutcomeInput = z.infer<typeof phoneOutcomeSchema>;

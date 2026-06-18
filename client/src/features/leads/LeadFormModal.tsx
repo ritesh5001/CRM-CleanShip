@@ -19,6 +19,7 @@ export function LeadFormModal({ open, onClose }: Props) {
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    altPhone: '',
     email: '',
     company: '',
     city: '',
@@ -69,6 +70,10 @@ export function LeadFormModal({ open, onClose }: Props) {
         <div>
           <Label>Phone</Label>
           <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+        </div>
+        <div>
+          <Label>Alt Phone</Label>
+          <Input value={form.altPhone} onChange={(e) => set('altPhone', e.target.value)} />
         </div>
         <div>
           <Label>Email</Label>

@@ -49,10 +49,20 @@ export interface Lead {
   lastContactedAt?: string;
   nextFollowUpAt?: string;
   notes?: string;
+  phone1Outcome?: PhoneOutcome;
+  phone2Outcome?: PhoneOutcome;
   createdAt: string;
 }
 
 export type CallStatus = 'pending' | 'done' | 'not_done';
+
+export type PhoneCallStatus = 'pending' | 'connected' | 'not_connected' | 'voicemail' | 'incorrect_no';
+export type PhoneLeadOutcome = 'none' | 'interested' | 'not_interested';
+
+export interface PhoneOutcome {
+  callStatus: PhoneCallStatus;
+  leadOutcome: PhoneLeadOutcome;
+}
 
 export interface Remark {
   _id?: string;
@@ -61,6 +71,7 @@ export interface Remark {
   byName?: string;
   byRole?: string;
   createdAt: string;
+  phone?: 'phone1' | 'phone2' | null;
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';

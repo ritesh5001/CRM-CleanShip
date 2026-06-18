@@ -10,6 +10,7 @@ import {
   bulkAssignSchema,
   createLeadSchema,
   followUpSchema,
+  phoneOutcomeSchema,
   updateLeadSchema,
 } from '../validators/leadValidators.js';
 
@@ -37,5 +38,8 @@ router.post('/:id/remarks', validate(addRemarkSchema), ctrl.addRemark);
 
 // Schedule a follow-up inline — both roles (telecaller scoped in controller).
 router.post('/:id/followup', validate(followUpSchema), ctrl.scheduleFollowUp);
+
+// Per-phone call outcome — both roles (telecaller scoped in controller).
+router.patch('/:id/phone-outcome', validate(phoneOutcomeSchema), ctrl.updatePhoneOutcome);
 
 export default router;

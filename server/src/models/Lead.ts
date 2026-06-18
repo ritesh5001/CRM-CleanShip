@@ -24,6 +24,34 @@ export const LEAD_STATUSES: LeadStatus[] = [
 export const LEAD_PRIORITIES = ['low', 'medium', 'high'] as const;
 export const CALL_STATUSES = ['pending', 'done', 'not_done'] as const;
 
+export const PHONE_CALL_STATUSES = ['pending', 'connected', 'not_connected', 'voicemail', 'incorrect_no'] as const;
+export type PhoneCallStatus = (typeof PHONE_CALL_STATUSES)[number];
+
+export const PHONE_LEAD_OUTCOMES = ['none', 'interested', 'not_interested'] as const;
+export type PhoneLeadOutcome = (typeof PHONE_LEAD_OUTCOMES)[number];
+
+/** Derives the overall lead callStatus from the two per-phone statuses. */
+export function deriveCallStatus(p1: PhoneCallStatus, p2: PhoneCallStatus): 'pending' | 'done' | 'not_done' {
+  if (p1 === 'connected' || p2 === 'connected') return 'done';
+  if (p1 !== 'pending' || p2 !== 'pending') return 'not_done';
+  return 'pending';
+}
+
+/** Derives overall lead status from per-phone outcomes. 'interested' always wins. Returns null when both 'none'. */
+export function deriveLeadStatus(p1: PhoneLeadOutcome, p2: PhoneLeadOutcome) {
+  if (p1 === 'interested' || p2 === 'interested') return { status: 'interested' as const, qualified: true };
+  if (p1 === 'not_interested' || p2 === 'not_interested') return { status: 'not_interested' as const, qualified: false };
+  return null;
+}
+
+const phoneOutcomeSchema = new Schema(
+  {
+    callStatus: { type: String, enum: PHONE_CALL_STATUSES, default: 'pending' },
+    leadOutcome: { type: String, enum: PHONE_LEAD_OUTCOMES, default: 'none' },
+  },
+  { _id: false }
+);
+
 const remarkSchema = new Schema(
   {
     text: { type: String, required: true, trim: true },
@@ -31,6 +59,7 @@ const remarkSchema = new Schema(
     byName: { type: String, default: '' },
     byRole: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
+    phone: { type: String, enum: ['phone1', 'phone2'], default: null },
   },
   { _id: true }
 );
@@ -59,6 +88,8 @@ const leadSchema = new Schema(
     lastContactedAt: { type: Date },
     nextFollowUpAt: { type: Date },
     notes: { type: String, default: '' },
+    phone1Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
+    phone2Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
     createdBy: { type: Types.ObjectId, ref: 'User' },
     importBatch: { type: Types.ObjectId, ref: 'ImportBatch' },
   },

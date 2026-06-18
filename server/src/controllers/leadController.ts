@@ -1,13 +1,15 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
-import { Lead } from '../models/Lead.js';
+import { Lead, deriveCallStatus, deriveLeadStatus } from '../models/Lead.js';
+import type { PhoneCallStatus, PhoneLeadOutcome } from '../models/Lead.js';
 import { User } from '../models/User.js';
 import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
 import { importLeads } from '../services/importService.js';
 import { notify } from '../services/notificationService.js';
 import { idOf } from '../utils/idOf.js';
+import type { PhoneOutcomeInput } from '../validators/leadValidators.js';
 
 // Builds the Mongo filter from query params. `includeCallStatus=false` is used by
 // the stats endpoint so chip counts reflect every callStatus within the same scope.
@@ -277,4 +279,54 @@ export const importLeadsHandler = asyncHandler(async (req: Request, res: Respons
     });
   }
   res.status(201).json({ success: true, result });
+});
+
+export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Response) => {
+  const { phone, callStatus, leadOutcome, remark } = req.body as PhoneOutcomeInput;
+
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) throw ApiError.notFound('Contact not found');
+
+  if (req.user!.role === 'telecaller' && idOf(lead.assignedTo) !== req.user!.id) {
+    throw ApiError.forbidden('This contact is not assigned to you');
+  }
+
+  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+
+  if (callStatus) {
+    (slot as { callStatus: PhoneCallStatus }).callStatus = callStatus;
+    if (callStatus === 'connected') lead.lastContactedAt = new Date();
+  }
+  if (leadOutcome) {
+    (slot as { leadOutcome: PhoneLeadOutcome }).leadOutcome = leadOutcome;
+    if (leadOutcome !== 'none') lead.lastOutcome = leadOutcome;
+  }
+
+  lead.callStatus = deriveCallStatus(
+    (lead.phone1Outcome as { callStatus: PhoneCallStatus }).callStatus,
+    (lead.phone2Outcome as { callStatus: PhoneCallStatus }).callStatus
+  );
+
+  const derived = deriveLeadStatus(
+    (lead.phone1Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome,
+    (lead.phone2Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome
+  );
+  if (derived !== null) {
+    lead.status = derived.status;
+    lead.qualified = derived.qualified;
+  }
+
+  if (remark?.trim()) {
+    lead.remarks.push({
+      text: remark.trim(),
+      by: req.user!.id as unknown as typeof lead.remarks[0]['by'],
+      byName: req.user!.name ?? '',
+      byRole: req.user!.role,
+      createdAt: new Date(),
+      phone,
+    } as typeof lead.remarks[0]);
+  }
+
+  await lead.save();
+  res.json({ success: true, lead });
 });

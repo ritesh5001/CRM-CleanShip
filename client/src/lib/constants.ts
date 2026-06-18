@@ -1,4 +1,4 @@
-import type { CallStatus, Disposition, LeadStatus, TaskStatus } from '@/types';
+import type { CallStatus, Disposition, LeadStatus, PhoneCallStatus, PhoneLeadOutcome, TaskStatus } from '@/types';
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: 'New',
@@ -65,4 +65,32 @@ export const CALL_STATUS_COLORS: Record<CallStatus, string> = {
   pending: 'bg-slate-100 text-slate-600',
   done: 'bg-emerald-100 text-emerald-700',
   not_done: 'bg-amber-100 text-amber-700',
+};
+
+export const PHONE_CALL_STATUS_LABELS: Record<PhoneCallStatus, string> = {
+  pending: 'Not Called',
+  connected: 'Connected',
+  not_connected: 'Not Connected',
+  voicemail: 'Voice Mail',
+  incorrect_no: 'Incorrect No',
+};
+
+export const PHONE_CALL_STATUS_COLORS: Record<PhoneCallStatus, string> = {
+  pending: 'bg-slate-100 text-slate-500',
+  connected: 'bg-emerald-100 text-emerald-700',
+  not_connected: 'bg-amber-100 text-amber-700',
+  voicemail: 'bg-purple-100 text-purple-700',
+  incorrect_no: 'bg-rose-100 text-rose-700',
+};
+
+export const PHONE_LEAD_OUTCOME_LABELS: Record<PhoneLeadOutcome, string> = {
+  none: '—',
+  interested: 'Interested',
+  not_interested: 'Not Interested',
+};
+
+export const PHONE_LEAD_OUTCOME_COLORS: Record<PhoneLeadOutcome, string> = {
+  none: 'bg-slate-100 text-slate-400',
+  interested: 'bg-emerald-100 text-emerald-700',
+  not_interested: 'bg-rose-100 text-rose-700',
 };
