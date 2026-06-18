@@ -7,10 +7,15 @@ interface UiState {
   filtersCollapsed: boolean;
   density: Density;
   colWidths: Record<string, number>;
+  colOrder: string[]; // persisted order of the contacts table data columns
+  hiddenCols: string[]; // contacts table columns the user has hidden
   toggleSidebar: () => void;
   toggleFilters: () => void;
   setDensity: (d: Density) => void;
   setColWidths: (w: Record<string, number>) => void;
+  setColOrder: (o: string[]) => void;
+  toggleCol: (id: string) => void;
+  resetCols: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -20,10 +25,20 @@ export const useUiStore = create<UiState>()(
       filtersCollapsed: false,
       density: 'comfortable',
       colWidths: {},
+      colOrder: [],
+      hiddenCols: [],
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       toggleFilters: () => set((s) => ({ filtersCollapsed: !s.filtersCollapsed })),
       setDensity: (density) => set({ density }),
       setColWidths: (colWidths) => set({ colWidths }),
+      setColOrder: (colOrder) => set({ colOrder }),
+      toggleCol: (id) =>
+        set((s) => ({
+          hiddenCols: s.hiddenCols.includes(id)
+            ? s.hiddenCols.filter((x) => x !== id)
+            : [...s.hiddenCols, id],
+        })),
+      resetCols: () => set({ colOrder: [], hiddenCols: [], colWidths: {} }),
     }),
     { name: 'crm-ui' }
   )

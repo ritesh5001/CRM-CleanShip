@@ -15,7 +15,7 @@ import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Field';
-import { ContactsTable } from './ContactsTable';
+import { ContactsTable, ColumnsMenu } from './ContactsTable';
 import { LeadFormModal } from '@/features/leads/LeadFormModal';
 import { ImportModal } from '@/features/leads/ImportModal';
 import { downloadLeadsCsv } from '@/lib/csv';
@@ -216,6 +216,9 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
             <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-brand-500" />
           )}
         </button>
+
+        {/* Columns show/hide menu */}
+        <ColumnsMenu isAdmin={isAdmin} />
 
         {/* Action buttons */}
         <Button size="sm" variant="secondary" onClick={handleExport} loading={exporting}>

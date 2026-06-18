@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Phone,
   MessageCircle,
@@ -9,6 +9,9 @@ import {
   ArrowDown,
   Trash2,
   Copy,
+  Columns3,
+  GripVertical,
+  RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
@@ -131,6 +134,159 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
   );
 }
 
+/* ----------------------------- column registry ---------------------------- */
+
+interface CellCtx {
+  isAdmin: boolean;
+  telecallers: User[];
+  onAssign?: (id: string, tid: string, name: string) => void;
+}
+
+interface ColumnDef {
+  id: string;
+  label: string;
+  sortField?: string;
+  adminOnly?: boolean; // only rendered for superadmins
+  locked?: boolean; // cannot be hidden (always visible)
+  muted?: boolean; // cell gets the muted text color
+  cell: (lead: Lead, ctx: CellCtx) => ReactNode;
+}
+
+// Source-of-truth column definitions. Order here is the default order; the user
+// can reorder (drag) and hide/show columns — both persisted in the UI store.
+const COLUMNS: ColumnDef[] = [
+  {
+    id: 'name',
+    label: 'Name',
+    sortField: 'name',
+    locked: true,
+    cell: (l) => (
+      <div className="flex min-w-0 items-center gap-2">
+        <p className="truncate font-medium text-slate-800" title={l.name}>{l.name}</p>
+        <Badge className={`shrink-0 ${LEAD_STATUS_COLORS[l.status]}`}>{LEAD_STATUS_LABELS[l.status]}</Badge>
+        {l.qualified && <Badge className="shrink-0 bg-green-600 text-white">Lead</Badge>}
+      </div>
+    ),
+  },
+  { id: 'title', label: 'Title', muted: true, cell: (l) => <span className="block truncate" title={l.title}>{l.title || '—'}</span> },
+  { id: 'company', label: 'Company', sortField: 'company', muted: true, cell: (l) => <span className="block truncate" title={l.company}>{l.company || '—'}</span> },
+  { id: 'location', label: 'Location', sortField: 'country', muted: true, cell: (l) => <span className="block truncate" title={location(l)}>{location(l) || '—'}</span> },
+  { id: 'phone', label: 'Phone', cell: (l) => <PhoneActions phone={l.phone} /> },
+  { id: 'altphone', label: 'Alt Phone', cell: (l) => (l.altPhone ? <PhoneActions phone={l.altPhone} /> : <span className="text-slate-300">—</span>) },
+  {
+    id: 'email',
+    label: 'Email',
+    muted: true,
+    cell: (l) =>
+      l.email ? (
+        <a href={`mailto:${l.email}`} title={l.email} className="block truncate hover:text-brand-600" onClick={(e) => e.stopPropagation()}>
+          {l.email}
+        </a>
+      ) : (
+        '—'
+      ),
+  },
+  { id: 'priority', label: 'Priority', cell: (l, ctx) => <PriorityCell lead={l} isAdmin={ctx.isAdmin} /> },
+  {
+    id: 'assigned',
+    label: 'Assigned To',
+    sortField: 'assignedAt',
+    adminOnly: true,
+    cell: (l, ctx) =>
+      ctx.onAssign ? (
+        <AssignSelect lead={l} telecallers={ctx.telecallers} onAssign={ctx.onAssign} />
+      ) : (
+        (l.assignedTo as User | undefined)?.name ?? <span className="text-slate-300">—</span>
+      ),
+  },
+  { id: 'outcome', label: 'Outcome', sortField: 'callStatus', cell: (l) => <PhoneSummaryBadges lead={l} /> },
+  { id: 'lastContacted', label: 'Last Contacted', sortField: 'lastContactedAt', muted: true, cell: (l) => (l.lastContactedAt ? fmtDate(l.lastContactedAt) : '—') },
+  { id: 'followup', label: 'Follow-up', cell: (l) => <FollowUpCell lead={l} /> },
+  { id: 'added', label: 'Added', sortField: 'createdAt', muted: true, cell: (l) => fmtDate(l.createdAt) },
+  { id: 'remark', label: 'Remark', cell: (l) => <RemarkCell lead={l} /> },
+];
+
+const COLUMN_MAP: Record<string, ColumnDef> = Object.fromEntries(COLUMNS.map((c) => [c.id, c]));
+const DEFAULT_DATA_COL_IDS = COLUMNS.map((c) => c.id);
+
+/** Resolves the effective full data-column order from the persisted order, appending any new columns. */
+function resolveOrder(stored: string[]): string[] {
+  const valid = stored.filter((id) => COLUMN_MAP[id]);
+  const missing = DEFAULT_DATA_COL_IDS.filter((id) => !valid.includes(id));
+  return [...valid, ...missing];
+}
+
+/** Dropdown to show/hide table columns. Rendered in the contacts top bar. */
+export function ColumnsMenu({ isAdmin }: { isAdmin: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const hiddenCols = useUiStore((s) => s.hiddenCols);
+  const toggleCol = useUiStore((s) => s.toggleCol);
+  const resetCols = useUiStore((s) => s.resetCols);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const cols = COLUMNS.filter((c) => !c.adminOnly || isAdmin);
+  const hiddenCount = cols.filter((c) => hiddenCols.includes(c.id)).length;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+          open || hiddenCount
+            ? 'border-brand-400 bg-brand-50 text-brand-700'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        <Columns3 size={13} />
+        Columns
+        <ChevronDown size={12} />
+        {hiddenCount > 0 && <span className="ml-0.5 rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-white">{hiddenCount}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+          <div className="flex items-center justify-between px-2 py-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Toggle columns</span>
+            <button onClick={resetCols} className="flex items-center gap-1 text-[11px] text-brand-600 hover:underline">
+              <RotateCcw size={11} /> Reset
+            </button>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {cols.map((c) => {
+              const visible = !hiddenCols.includes(c.id);
+              return (
+                <label
+                  key={c.id}
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                    c.locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={visible}
+                    disabled={c.locked}
+                    onChange={() => toggleCol(c.id)}
+                    className="h-4 w-4 accent-brand-600"
+                  />
+                  {c.label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ContactsTable({
   leads,
   isLoading,
@@ -153,30 +309,25 @@ export function ContactsTable({
   // Resizable columns (widths persisted in the UI store).
   const storedWidths = useUiStore((s) => s.colWidths);
   const setColWidths = useUiStore((s) => s.setColWidths);
+  const colOrder = useUiStore((s) => s.colOrder);
+  const setColOrder = useUiStore((s) => s.setColOrder);
+  const hiddenCols = useUiStore((s) => s.hiddenCols);
   const [widths, setWidths] = useState<Record<string, number>>({ ...DEFAULT_WIDTHS, ...storedWidths });
   const widthsRef = useRef(widths);
   widthsRef.current = widths;
 
-  const colIds = [
-    ...(selectable ? ['select'] : []),
-    'expand',
-    'name',
-    'title',
-    'company',
-    'location',
-    'phone',
-    'altphone',
-    'email',
-    'priority',
-    ...(isAdmin ? ['assigned'] : []),
-    'outcome',
-    'lastContacted',
-    'followup',
-    'added',
-    'remark',
-  ];
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // The effective, ordered & visible data columns (respects role + hidden list).
+  const fullOrder = resolveOrder(colOrder);
+  const visibleCols = fullOrder
+    .map((id) => COLUMN_MAP[id])
+    .filter((c): c is ColumnDef => !!c && (!c.adminOnly || isAdmin) && !hiddenCols.includes(c.id));
+
+  const renderedColIds = [...(selectable ? ['select'] : []), 'expand', ...visibleCols.map((c) => c.id)];
   const widthOf = (id: string) => widths[id] ?? DEFAULT_WIDTHS[id] ?? 120;
-  const totalWidth = colIds.reduce((s, id) => s + widthOf(id), 0);
+  const totalWidth = renderedColIds.reduce((s, id) => s + widthOf(id), 0);
 
   function startResize(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -193,17 +344,23 @@ export function ContactsTable({
     document.addEventListener('mouseup', up);
   }
 
-  const Th = ({ id, children, resizable = true }: { id: string; children?: ReactNode; resizable?: boolean }) => (
-    <th className="relative select-none px-2 py-2">
-      {children}
-      {resizable && (
-        <span
-          onMouseDown={(e) => startResize(id, e)}
-          className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize hover:bg-brand-300"
-        />
-      )}
-    </th>
-  );
+  // Drag-to-reorder: operates on the full data order so hidden columns keep position.
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      setOverId(null);
+      return;
+    }
+    const base = resolveOrder(colOrder);
+    const from = base.indexOf(dragId);
+    const to = base.indexOf(targetId);
+    if (from !== -1 && to !== -1) {
+      base.splice(to, 0, base.splice(from, 1)[0]);
+      setColOrder(base);
+    }
+    setDragId(null);
+    setOverId(null);
+  }
 
   if (isLoading) return <Spinner />;
   if (!leads.length) return <EmptyState title="Nothing here yet" hint={emptyHint} />;
@@ -217,44 +374,66 @@ export function ContactsTable({
     </button>
   );
 
+  // Header cell for a draggable, resizable, sortable data column.
+  const ThData = ({ col }: { col: ColumnDef }) => (
+    <th
+      className={`relative select-none px-2 py-2 ${overId === col.id ? 'bg-brand-50' : ''}`}
+      onDragOver={(e) => {
+        if (dragId) {
+          e.preventDefault();
+          if (overId !== col.id) setOverId(col.id);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop(col.id);
+      }}
+    >
+      <div
+        draggable
+        onDragStart={() => setDragId(col.id)}
+        onDragEnd={() => { setDragId(null); setOverId(null); }}
+        title="Drag to reorder"
+        className={`flex cursor-grab items-center gap-1 active:cursor-grabbing ${dragId === col.id ? 'opacity-40' : ''}`}
+      >
+        <GripVertical size={11} className="shrink-0 text-slate-300" />
+        {col.sortField ? <SortHeader field={col.sortField} label={col.label} /> : <span>{col.label}</span>}
+      </div>
+      <span
+        onMouseDown={(e) => startResize(col.id, e)}
+        className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize hover:bg-brand-300"
+      />
+    </th>
+  );
+
   return (
     <>
-      {/* Desktop grid (horizontally scrollable, resizable columns) */}
+      {/* Desktop grid (horizontally scrollable, resizable + reorderable columns) */}
       <div className="hidden md:block">
         <table className="text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
           <colgroup>
-            {colIds.map((id) => (
+            {renderedColIds.map((id) => (
               <col key={id} style={{ width: widthOf(id) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
               {selectable && (
-                <Th id="select" resizable={false}>
+                <th className="relative select-none px-2 py-2">
                   <input type="checkbox" className="h-4 w-4" checked={!!allChecked} onChange={onToggleAll} />
-                </Th>
+                </th>
               )}
-              <Th id="expand" resizable={false} />
-              <Th id="name"><SortHeader field="name" label="Name" /></Th>
-              <Th id="title">Title</Th>
-              <Th id="company"><SortHeader field="company" label="Company" /></Th>
-              <Th id="location"><SortHeader field="country" label="Location" /></Th>
-              <Th id="phone">Phone</Th>
-              <Th id="altphone">Alt Phone</Th>
-              <Th id="email">Email</Th>
-              <Th id="priority">Priority</Th>
-              {isAdmin && <Th id="assigned"><SortHeader field="assignedAt" label="Assigned To" /></Th>}
-              <Th id="outcome"><SortHeader field="callStatus" label="Outcome" /></Th>
-              <Th id="lastContacted"><SortHeader field="lastContactedAt" label="Last Contacted" /></Th>
-              <Th id="followup">Follow-up</Th>
-              <Th id="added"><SortHeader field="createdAt" label="Added" /></Th>
-              <Th id="remark">Remark</Th>
+              <th className="relative select-none px-2 py-2" />
+              {visibleCols.map((col) => (
+                <ThData key={col.id} col={col} />
+              ))}
             </tr>
           </thead>
           <tbody>
             {leads.map((lead) => (
               <Row
                 key={lead._id}
+                columns={visibleCols}
                 lead={lead}
                 isAdmin={isAdmin}
                 role={role}
@@ -595,8 +774,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function Row({
   lead,
+  columns,
   isAdmin,
-  role,
   pad,
   selectable,
   selected,
@@ -605,6 +784,7 @@ function Row({
   onAssign,
 }: {
   lead: Lead;
+  columns: ColumnDef[];
   isAdmin: boolean;
   role: Role;
   pad: string;
@@ -616,6 +796,7 @@ function Row({
 }) {
   const [open, setOpen] = useState(false);
   const muted = 'text-slate-500';
+  const ctx: CellCtx = { isAdmin, telecallers, onAssign };
 
   return (
     <>
@@ -630,65 +811,11 @@ function Row({
             {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         </td>
-        <td className={pad}>
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate font-medium text-slate-800" title={lead.name}>{lead.name}</p>
-            <Badge className={`shrink-0 ${LEAD_STATUS_COLORS[lead.status]}`}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
-            {lead.qualified && <Badge className="shrink-0 bg-green-600 text-white">Lead</Badge>}
-          </div>
-        </td>
-        <td className={`${pad} ${muted}`}>
-          <span className="block truncate" title={lead.title}>{lead.title || '—'}</span>
-        </td>
-        <td className={`${pad} ${muted}`}>
-          <span className="block truncate" title={lead.company}>{lead.company || '—'}</span>
-        </td>
-        <td className={`${pad} ${muted}`}>
-          <span className="block truncate" title={location(lead)}>{location(lead) || '—'}</span>
-        </td>
-        <td className={pad}>
-          <PhoneActions phone={lead.phone} />
-        </td>
-        <td className={pad}>
-          {lead.altPhone ? <PhoneActions phone={lead.altPhone} /> : <span className="text-slate-300">—</span>}
-        </td>
-        <td className={`${pad} ${muted}`}>
-          {lead.email ? (
-            <a
-              href={`mailto:${lead.email}`}
-              title={lead.email}
-              className="block truncate hover:text-brand-600"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {lead.email}
-            </a>
-          ) : (
-            '—'
-          )}
-        </td>
-        <td className={pad}>
-          <PriorityCell lead={lead} isAdmin={isAdmin} />
-        </td>
-        {isAdmin && (
-          <td className={pad}>
-            {onAssign ? (
-              <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />
-            ) : (
-              (lead.assignedTo as User | undefined)?.name ?? <span className="text-slate-300">—</span>
-            )}
+        {columns.map((col) => (
+          <td key={col.id} className={col.muted ? `${pad} ${muted}` : pad}>
+            {col.cell(lead, ctx)}
           </td>
-        )}
-        <td className={pad}>
-          <PhoneSummaryBadges lead={lead} />
-        </td>
-        <td className={`${pad} ${muted}`}>{lead.lastContactedAt ? fmtDate(lead.lastContactedAt) : '—'}</td>
-        <td className={pad}>
-          <FollowUpCell lead={lead} />
-        </td>
-        <td className={`${pad} ${muted}`}>{fmtDate(lead.createdAt)}</td>
-        <td className={pad}>
-          <RemarkCell lead={lead} />
-        </td>
+        ))}
       </tr>
       {open && (
         <tr>
