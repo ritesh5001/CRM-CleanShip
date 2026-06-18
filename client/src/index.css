@@ -11,3 +11,18 @@ body,
 body {
   @apply bg-slate-100 text-slate-800 antialiased;
 }
+
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+/* Let the browser theme native form controls, scrollbars & date pickers. */
+.dark {
+  color-scheme: dark;
+}
+
+/* Smoothly ease surfaces between light & dark. */
+body,
+.dark body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

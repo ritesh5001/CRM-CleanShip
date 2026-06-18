@@ -102,10 +102,10 @@ function FollowUpCell({ lead }: { lead: Lead }) {
             { onSuccess: () => toast.success('Follow-up scheduled'), onError: (err) => toast.error(apiError(err)) }
           )
         }
-        className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+        className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
       />
       {lead.nextFollowUpAt && (
-        <p className="text-[11px] text-slate-400">Next: {fmtDate(lead.nextFollowUpAt)}</p>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">Next: {fmtDate(lead.nextFollowUpAt)}</p>
       )}
     </div>
   );
@@ -120,7 +120,7 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
       <button
         onClick={() => copyPhone(phone)}
         title="Copy number"
-        className={`${cls} text-slate-500 hover:bg-slate-100`}
+        className={`${cls} text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700`}
       >
         <Copy size={size} />
       </button>
@@ -164,7 +164,7 @@ function CallStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2
           { onError: (err) => toast.error(apiError(err)) }
         )
       }
-      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 ${PHONE_CALL_STATUS_COLORS[value]}`}
+      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_CALL_STATUS_COLORS[value]}`}
     >
       <option value="pending">Not Called</option>
       <option value="connected">Connected</option>
@@ -192,7 +192,7 @@ function LeadStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2
           { onError: (err) => toast.error(apiError(err)) }
         )
       }
-      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 ${PHONE_LEAD_OUTCOME_COLORS[value]}`}
+      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_LEAD_OUTCOME_COLORS[value]}`}
     >
       <option value="none">—</option>
       <option value="interested">Interested</option>
@@ -225,7 +225,7 @@ function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Remark…"
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
         <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
           <Send size={13} />
@@ -268,7 +268,7 @@ const COLUMNS: ColumnDef[] = [
     locked: true,
     cell: (l) => (
       <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate font-medium text-slate-800" title={l.name}>{l.name}</p>
+        <p className="truncate font-medium text-slate-800 dark:text-slate-100" title={l.name}>{l.name}</p>
         <Badge className={`shrink-0 ${LEAD_STATUS_COLORS[l.status]}`}>{LEAD_STATUS_LABELS[l.status]}</Badge>
         {l.qualified && <Badge className="shrink-0 bg-green-600 text-white">Lead</Badge>}
       </div>
@@ -352,8 +352,8 @@ export function ColumnsMenu({ isAdmin }: { isAdmin: boolean }) {
         onClick={() => setOpen((o) => !o)}
         className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
           open || hiddenCount
-            ? 'border-brand-400 bg-brand-50 text-brand-700'
-            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
         }`}
       >
         <Columns3 size={13} />
@@ -362,21 +362,21 @@ export function ColumnsMenu({ isAdmin }: { isAdmin: boolean }) {
         {hiddenCount > 0 && <span className="ml-0.5 rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-white">{hiddenCount}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Toggle columns</span>
-            <button onClick={resetCols} className="flex items-center gap-1 text-[11px] text-brand-600 hover:underline">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Toggle columns</span>
+            <button onClick={resetCols} className="flex items-center gap-1 text-[11px] text-brand-600 hover:underline dark:text-brand-400">
               <RotateCcw size={11} /> Reset
             </button>
           </div>
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto text-slate-700 dark:text-slate-200">
             {cols.map((c) => {
               const visible = !hiddenCols.includes(c.id);
               return (
                 <label
                   key={c.id}
                   className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
-                    c.locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-slate-50'
+                    c.locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                 >
                   <input
@@ -478,7 +478,7 @@ export function ContactsTable({
   const allChecked = selectable && leads.every((l) => selected.includes(l._id));
 
   const SortHeader = ({ field, label }: { field: string; label: string }) => (
-    <button onClick={() => onSort(field)} className="flex items-center gap-1 hover:text-slate-700">
+    <button onClick={() => onSort(field)} className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
       {label}
       {sortBy === field && (order === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
     </button>
@@ -526,8 +526,8 @@ export function ContactsTable({
               <col key={id} style={{ width: widthOf(id) }} />
             ))}
           </colgroup>
-          <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
-            <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
+          <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[0_1px_0_0_#334155]">
+            <tr className="text-left text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
               {selectable && (
                 <th className="relative select-none px-2 py-2">
                   <input type="checkbox" className="h-4 w-4" checked={!!allChecked} onChange={onToggleAll} />
@@ -560,7 +560,7 @@ export function ContactsTable({
       </div>
 
       {/* Mobile cards */}
-      <div className="divide-y divide-slate-100 md:hidden">
+      <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
         {leads.map((lead) => (
           <MobileCard
             key={lead._id}
@@ -598,7 +598,7 @@ function AssignSelect({
         const t = telecallers.find((x) => x._id === e.target.value);
         if (t) onAssign?.(lead._id, t._id, t.name);
       }}
-      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
     >
       <option value="">Assign…</option>
       {telecallers.map((t) => (
@@ -625,7 +625,7 @@ function PriorityCell({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
           { onError: (err) => toast.error(apiError(err)) }
         )
       }
-      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500"
+      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
     >
       {PRIORITIES.map((p) => (
         <option key={p} value={p}>
@@ -693,8 +693,8 @@ function PhoneOutcomePanel({
 
   if (isAdmin) {
     return (
-      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
         <div className="flex items-center gap-2 flex-wrap">
           <PhoneActions phone={phoneNumber} />
           <Badge className={PHONE_CALL_STATUS_COLORS[slot.callStatus]}>
@@ -707,9 +707,9 @@ function PhoneOutcomePanel({
           )}
         </div>
         {phoneRemarks.slice(-2).reverse().map((r, i) => (
-          <div key={r._id ?? i} className="rounded bg-slate-50 p-1.5 text-xs text-slate-600">
+          <div key={r._id ?? i} className="rounded bg-slate-50 p-1.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             {r.text}
-            <span className="ml-1 text-[10px] text-slate-400">{fmtDate(r.createdAt)}</span>
+            <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500">{fmtDate(r.createdAt)}</span>
           </div>
         ))}
       </div>
@@ -717,8 +717,8 @@ function PhoneOutcomePanel({
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
       <PhoneActions phone={phoneNumber} />
       <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
         {PHONE_CALL_OPTIONS.map((cs) => (
@@ -729,7 +729,7 @@ function PhoneOutcomePanel({
             className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
               slot.callStatus === cs
                 ? `${PHONE_CALL_STATUS_COLORS[cs]} ring-1 ring-current`
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
             }`}
           >
             {PHONE_CALL_STATUS_LABELS[cs]}
@@ -745,7 +745,7 @@ function PhoneOutcomePanel({
             className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
               slot.leadOutcome === lo
                 ? `${PHONE_LEAD_OUTCOME_COLORS[lo]} ring-1 ring-current`
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
             }`}
           >
             {PHONE_LEAD_OUTCOME_LABELS[lo]}
@@ -758,7 +758,7 @@ function PhoneOutcomePanel({
           onChange={(e) => setRemarkText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submitRemark()}
           placeholder={`Remark for ${label}…`}
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
         <button onClick={submitRemark} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Send">
           <Send size={13} />
@@ -793,7 +793,7 @@ function RemarkCell({ lead }: { lead: Lead }) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Add remark…"
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
         <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
           <Send size={13} />
@@ -821,7 +821,7 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
   }
 
   return (
-    <div className="space-y-4 bg-slate-50 p-4">
+    <div className="space-y-4 bg-slate-50 p-4 dark:bg-slate-900/50">
       {/* Per-phone call tracking */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PhoneOutcomePanel lead={lead} phone="phone1" isAdmin={isAdmin} />
@@ -847,16 +847,16 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
           )}
         </div>
         <div>
-          <p className="mb-1 text-xs font-semibold text-slate-500">All Remarks</p>
+          <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">All Remarks</p>
           <div className="max-h-48 space-y-1.5 overflow-y-auto">
-            {!lead.remarks?.length && <p className="text-xs text-slate-400">No remarks yet.</p>}
+            {!lead.remarks?.length && <p className="text-xs text-slate-400 dark:text-slate-500">No remarks yet.</p>}
             {(lead.remarks ?? [])
               .slice()
               .reverse()
               .map((r, i) => (
-                <div key={r._id ?? i} className="rounded-lg bg-white p-2">
-                  <p className="text-xs text-slate-700">{r.text}</p>
-                  <p className="mt-0.5 text-[10px] text-slate-400">
+                <div key={r._id ?? i} className="rounded-lg bg-white p-2 dark:bg-slate-800">
+                  <p className="text-xs text-slate-700 dark:text-slate-200">{r.text}</p>
+                  <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
                     {r.byName || 'Unknown'}
                     {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'User'})` : ''}
                     {r.phone ? ` · ${r.phone === 'phone1' ? 'Phone 1' : 'Phone 2'}` : ''} ·{' '}
@@ -874,8 +874,8 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-xs text-slate-400">{label}</span>
-      <p className="break-words text-slate-700">{value}</p>
+      <span className="text-xs text-slate-400 dark:text-slate-500">{label}</span>
+      <p className="break-words text-slate-700 dark:text-slate-200">{value}</p>
     </div>
   );
 }
@@ -905,12 +905,12 @@ function Row({
   onAssign?: (id: string, tid: string, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const muted = 'text-slate-500';
+  const muted = 'text-slate-500 dark:text-slate-400';
   const ctx: CellCtx = { isAdmin, telecallers, onAssign };
 
   return (
     <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50/60">
+      <tr className="border-b border-slate-100 hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/40">
         {selectable && (
           <td className={pad}>
             <input type="checkbox" className="h-4 w-4" checked={selected} onChange={() => onToggle(lead._id)} />
@@ -969,10 +969,10 @@ function MobileCard({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-medium text-slate-800">{lead.name}</p>
+            <p className="font-medium text-slate-800 dark:text-slate-100">{lead.name}</p>
             {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
           </div>
-          <p className="truncate text-sm text-slate-500">
+          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
             {lead.phone}
             {lead.company ? ` · ${lead.company}` : ''}
           </p>

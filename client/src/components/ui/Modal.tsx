@@ -17,16 +17,16 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: P
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div
-        className={`flex max-h-[92vh] w-full ${sizes[size]} flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
+        className={`flex max-h-[92vh] w-full ${sizes[size]} flex-col rounded-t-2xl bg-white shadow-xl dark:bg-slate-900 sm:rounded-2xl`}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
-          <h3 className="font-semibold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5 dark:border-slate-700">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+          <button onClick={onClose} className="rounded p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
             <X size={18} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="border-t border-slate-200 px-5 py-3">{footer}</div>}
+        {footer && <div className="border-t border-slate-200 px-5 py-3 dark:border-slate-700">{footer}</div>}
       </div>
     </div>
   );

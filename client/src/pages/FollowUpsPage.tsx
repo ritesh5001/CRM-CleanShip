@@ -31,7 +31,7 @@ export function FollowUpsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-slate-800">Follow-ups</h1>
+      <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Follow-ups</h1>
 
       <div className="flex flex-wrap gap-2">
         {SCOPES.map((s) => (
@@ -39,7 +39,9 @@ export function FollowUpsPage() {
             key={s.key}
             onClick={() => setScope(s.key)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              scope === s.key ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+              scope === s.key
+                ? 'bg-brand-600 text-white'
+                : 'bg-white text-slate-600 border border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
             }`}
           >
             {s.label}
@@ -53,7 +55,7 @@ export function FollowUpsPage() {
         ) : !data?.data.length ? (
           <EmptyState title="No follow-ups" hint="You're all caught up here." />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.data.map((f) => {
               const lead = f.lead as Lead;
               const overdue = isOverdue(f.scheduledAt);
@@ -61,12 +63,12 @@ export function FollowUpsPage() {
                 <div key={f._id} className="flex flex-wrap items-center gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-800">{lead?.name}</p>
+                      <p className="font-medium text-slate-800 dark:text-slate-100">{lead?.name}</p>
                       {overdue && <Badge className="bg-rose-100 text-rose-700">Overdue</Badge>}
                     </div>
-                    <p className="text-sm text-slate-500">{lead?.phone}</p>
-                    <p className="text-xs text-slate-400">Scheduled {fmtDateTime(f.scheduledAt)}</p>
-                    {f.notes && <p className="mt-1 text-xs text-slate-500">“{f.notes}”</p>}
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{lead?.phone}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Scheduled {fmtDateTime(f.scheduledAt)}</p>
+                    {f.notes && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">“{f.notes}”</p>}
                   </div>
                   <div className="flex gap-1.5">
                     {lead?.phone && (

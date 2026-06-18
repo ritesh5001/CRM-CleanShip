@@ -35,7 +35,7 @@ export function TasksPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">{isAdmin ? 'Tasks' : 'My Tasks'}</h1>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{isAdmin ? 'Tasks' : 'My Tasks'}</h1>
         {isAdmin && (
           <Button onClick={() => setFormOpen(true)}>
             <Plus size={16} /> Assign task
@@ -57,7 +57,7 @@ export function TasksPage() {
         ) : !data?.data.length ? (
           <EmptyState title="No tasks" hint={isAdmin ? 'Assign a task to a user.' : 'You have no tasks right now.'} />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.data.map((task) => {
               const assignee = task.assignedTo as User | undefined;
               const overdue = task.status !== 'completed' && isOverdue(task.dueDate);
@@ -65,14 +65,14 @@ export function TasksPage() {
                 <div key={task._id} className="flex flex-wrap items-center gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-slate-800">{task.title}</p>
+                      <p className="font-medium text-slate-800 dark:text-slate-100">{task.title}</p>
                       <Badge className={TASK_STATUS_COLORS[task.status]}>
                         {TASK_STATUS_LABELS[task.status]}
                       </Badge>
                       <Badge className={PRIORITY_COLORS[task.priority]}>{task.priority}</Badge>
                     </div>
-                    {task.description && <p className="text-sm text-slate-500">{task.description}</p>}
-                    <p className="text-xs text-slate-400">
+                    {task.description && <p className="text-sm text-slate-500 dark:text-slate-400">{task.description}</p>}
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
                       {isAdmin && assignee ? `${assignee.name} · ` : ''}
                       {task.dueDate && (
                         <span className={overdue ? 'font-medium text-rose-500' : ''}>

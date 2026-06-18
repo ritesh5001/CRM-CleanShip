@@ -67,9 +67,9 @@ export function ImportModal({ open, onClose }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-8 hover:border-brand-400">
-            <UploadCloud className="text-slate-400" size={28} />
-            <span className="text-sm text-slate-500">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-8 hover:border-brand-400 dark:border-slate-600">
+            <UploadCloud className="text-slate-400 dark:text-slate-500" size={28} />
+            <span className="text-sm text-slate-500 dark:text-slate-400">
               {file ? file.name : 'Click to choose a CSV or Excel file'}
             </span>
             <input

@@ -34,13 +34,13 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-brand-600 to-brand-800 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl dark:bg-slate-900">
         <div className="mb-6 flex flex-col items-center">
           <div className="mb-3 rounded-xl bg-brand-600 p-3 text-white">
             <Phone size={26} />
           </div>
-          <h1 className="text-xl font-bold text-slate-800">CleanShip CRM</h1>
-          <p className="text-sm text-slate-400">User Management</p>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">CleanShip CRM</h1>
+          <p className="text-sm text-slate-400 dark:text-slate-500">User Management</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

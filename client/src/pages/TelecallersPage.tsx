@@ -49,7 +49,7 @@ export function TelecallersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Users</h1>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Users</h1>
         <Button
           onClick={() => {
             setEditing(null);
@@ -61,7 +61,7 @@ export function TelecallersPage() {
       </div>
 
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+        <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
         <Input
           className="pl-9"
           placeholder="Search by name, email, phone"
@@ -76,21 +76,21 @@ export function TelecallersPage() {
         ) : !data?.data.length ? (
           <EmptyState title="No users yet" hint="Add your first user to get started." />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.data.map((u) => (
               <div key={u._id} className="flex flex-wrap items-center gap-3 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
                   {u.name[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-800">{u.name}</p>
-                    <Badge className={u.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">{u.name}</p>
+                    <Badge className={u.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300'}>
                       {u.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </div>
-                  <p className="truncate text-sm text-slate-500">{u.email}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">{u.email}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     Target: {u.dailyTarget}/day · Last login {fmtRelative(u.lastLoginAt)}
                   </p>
                 </div>

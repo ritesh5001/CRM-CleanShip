@@ -21,7 +21,7 @@ export function NotificationBell() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
         aria-label="Notifications"
       >
         <Bell size={20} />
@@ -35,9 +35,9 @@ export function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-2 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-              <span className="text-sm font-semibold">Notifications</span>
+          <div className="absolute right-0 z-40 mt-2 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 dark:border-slate-700">
+              <span className="text-sm font-semibold dark:text-slate-100">Notifications</span>
               {unread > 0 && (
                 <button
                   onClick={() => markAll.mutate()}
@@ -48,7 +48,7 @@ export function NotificationBell() {
               )}
             </div>
             {!data?.data.length && (
-              <p className="p-6 text-center text-sm text-slate-400">No notifications</p>
+              <p className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">No notifications</p>
             )}
             {data?.data.map((n) => (
               <button
@@ -58,13 +58,13 @@ export function NotificationBell() {
                   if (n.link) navigate(n.link);
                   setOpen(false);
                 }}
-                className={`block w-full border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 ${
-                  n.isRead ? '' : 'bg-brand-50/40'
+                className={`block w-full border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 dark:border-slate-700/50 dark:hover:bg-slate-700/50 ${
+                  n.isRead ? '' : 'bg-brand-50/40 dark:bg-brand-500/10'
                 }`}
               >
-                <p className="text-sm font-medium text-slate-700">{n.title}</p>
-                {n.message && <p className="text-xs text-slate-500">{n.message}</p>}
-                <p className="mt-0.5 text-[11px] text-slate-400">{fmtRelative(n.createdAt)}</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{n.title}</p>
+                {n.message && <p className="text-xs text-slate-500 dark:text-slate-400">{n.message}</p>}
+                <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{fmtRelative(n.createdAt)}</p>
               </button>
             ))}
           </div>
