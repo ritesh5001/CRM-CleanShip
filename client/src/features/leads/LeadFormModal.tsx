@@ -20,6 +20,7 @@ export function LeadFormModal({ open, onClose }: Props) {
     name: '',
     phone: '',
     altPhone: '',
+    altPhone2: '',
     email: '',
     company: '',
     city: '',
@@ -74,6 +75,10 @@ export function LeadFormModal({ open, onClose }: Props) {
         <div>
           <Label>Alt Phone</Label>
           <Input value={form.altPhone} onChange={(e) => set('altPhone', e.target.value)} />
+        </div>
+        <div>
+          <Label>Alt Phone 2</Label>
+          <Input value={form.altPhone2} onChange={(e) => set('altPhone2', e.target.value)} />
         </div>
         <div>
           <Label>Email</Label>

@@ -30,17 +30,17 @@ export type PhoneCallStatus = (typeof PHONE_CALL_STATUSES)[number];
 export const PHONE_LEAD_OUTCOMES = ['none', 'interested', 'not_interested'] as const;
 export type PhoneLeadOutcome = (typeof PHONE_LEAD_OUTCOMES)[number];
 
-/** Derives the overall lead callStatus from the two per-phone statuses. */
-export function deriveCallStatus(p1: PhoneCallStatus, p2: PhoneCallStatus): 'pending' | 'done' | 'not_done' {
-  if (p1 === 'connected' || p2 === 'connected') return 'done';
-  if (p1 !== 'pending' || p2 !== 'pending') return 'not_done';
+/** Derives the overall lead callStatus from the per-phone statuses. */
+export function deriveCallStatus(...statuses: PhoneCallStatus[]): 'pending' | 'done' | 'not_done' {
+  if (statuses.some((s) => s === 'connected')) return 'done';
+  if (statuses.some((s) => s !== 'pending')) return 'not_done';
   return 'pending';
 }
 
-/** Derives overall lead status from per-phone outcomes. 'interested' always wins. Returns null when both 'none'. */
-export function deriveLeadStatus(p1: PhoneLeadOutcome, p2: PhoneLeadOutcome) {
-  if (p1 === 'interested' || p2 === 'interested') return { status: 'interested' as const, qualified: true };
-  if (p1 === 'not_interested' || p2 === 'not_interested') return { status: 'not_interested' as const, qualified: false };
+/** Derives overall lead status from per-phone outcomes. 'interested' always wins. Returns null when all 'none'. */
+export function deriveLeadStatus(...outcomes: PhoneLeadOutcome[]) {
+  if (outcomes.some((o) => o === 'interested')) return { status: 'interested' as const, qualified: true };
+  if (outcomes.some((o) => o === 'not_interested')) return { status: 'not_interested' as const, qualified: false };
   return null;
 }
 
@@ -59,7 +59,7 @@ const remarkSchema = new Schema(
     byName: { type: String, default: '' },
     byRole: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
-    phone: { type: String, enum: ['phone1', 'phone2'], default: null },
+    phone: { type: String, enum: ['phone1', 'phone2', 'phone3'], default: null },
   },
   { _id: true }
 );
@@ -69,6 +69,7 @@ const leadSchema = new Schema(
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true, index: true },
     altPhone: { type: String, trim: true, default: '' },
+    altPhone2: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, lowercase: true, default: '' },
     title: { type: String, trim: true, default: '' },
     company: { type: String, trim: true, default: '' },
@@ -90,6 +91,7 @@ const leadSchema = new Schema(
     notes: { type: String, default: '' },
     phone1Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
     phone2Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
+    phone3Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
     createdBy: { type: Types.ObjectId, ref: 'User' },
     importBatch: { type: Types.ObjectId, ref: 'ImportBatch' },
   },

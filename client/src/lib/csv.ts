@@ -14,6 +14,7 @@ const COLUMNS: { header: string; value: (l: Lead) => unknown }[] = [
   { header: 'Company', value: (l) => l.company },
   { header: 'Phone', value: (l) => l.phone },
   { header: 'Alt Phone', value: (l) => l.altPhone },
+  { header: 'Alt Phone 2', value: (l) => l.altPhone2 },
   { header: 'Email', value: (l) => l.email },
   { header: 'City', value: (l) => l.city },
   { header: 'State', value: (l) => l.state },

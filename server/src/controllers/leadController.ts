@@ -297,7 +297,8 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
     throw ApiError.forbidden('This contact is not assigned to you');
   }
 
-  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+  const slot =
+    phone === 'phone1' ? lead.phone1Outcome : phone === 'phone2' ? lead.phone2Outcome : lead.phone3Outcome;
 
   if (callStatus) {
     (slot as { callStatus: PhoneCallStatus }).callStatus = callStatus;
@@ -325,12 +326,14 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
 
   lead.callStatus = deriveCallStatus(
     (lead.phone1Outcome as { callStatus: PhoneCallStatus }).callStatus,
-    (lead.phone2Outcome as { callStatus: PhoneCallStatus }).callStatus
+    (lead.phone2Outcome as { callStatus: PhoneCallStatus }).callStatus,
+    (lead.phone3Outcome as { callStatus: PhoneCallStatus }).callStatus
   );
 
   const derived = deriveLeadStatus(
     (lead.phone1Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome,
-    (lead.phone2Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome
+    (lead.phone2Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome,
+    (lead.phone3Outcome as { leadOutcome: PhoneLeadOutcome }).leadOutcome
   );
   if (derived !== null) {
     lead.status = derived.status;

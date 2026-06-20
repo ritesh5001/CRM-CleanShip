@@ -49,6 +49,10 @@ const DEFAULT_WIDTHS: Record<string, number> = {
   callstatus2: 145,
   leadstatus2: 140,
   remark2: 200,
+  phone3: 130,
+  callstatus3: 145,
+  leadstatus3: 140,
+  remark3: 200,
   lastContacted: 120,
   followup: 200,
   added: 110,
@@ -141,19 +145,31 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
 
 /* --------------------------- per-phone cell inputs ------------------------- */
 
+type PhoneSlot = 'phone1' | 'phone2' | 'phone3';
+
+/** Resolves a contact's phone number for the given slot (phone1=primary, phone2/3=alternates). */
+function phoneNumberOf(lead: Lead, phone: PhoneSlot) {
+  return phone === 'phone1' ? lead.phone : phone === 'phone2' ? lead.altPhone : lead.altPhone2;
+}
+
+/** Resolves the per-phone outcome sub-document for the given slot. */
+function phoneSlotOf(lead: Lead, phone: PhoneSlot) {
+  return phone === 'phone1' ? lead.phone1Outcome : phone === 'phone2' ? lead.phone2Outcome : lead.phone3Outcome;
+}
+
 /** Phone number with copy/call/WhatsApp actions, or a dash when empty. */
-function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
-  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
+  const num = phoneNumberOf(lead, phone);
   return num ? <PhoneActions phone={num} /> : <span className="text-slate-300">—</span>;
 }
 
 /** Inline call-status dropdown for one phone (connected / not connected / voice mail / incorrect no). */
-function CallStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+function CallStatusCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const update = useUpdatePhoneOutcome();
-  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
-  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+  const num = phoneNumberOf(lead, phone);
+  const slot = phoneSlotOf(lead, phone);
   const value = (slot?.callStatus ?? 'pending') as PhoneCallStatus;
-  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  if (phone !== 'phone1' && !num) return <span className="text-slate-300">—</span>;
   return (
     <select
       value={value}
@@ -176,12 +192,12 @@ function CallStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2
 }
 
 /** Inline lead-outcome dropdown for one phone (interested / not interested). */
-function LeadStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+function LeadStatusCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const update = useUpdatePhoneOutcome();
-  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
-  const slot = phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome;
+  const num = phoneNumberOf(lead, phone);
+  const slot = phoneSlotOf(lead, phone);
   const value = (slot?.leadOutcome ?? 'none') as PhoneLeadOutcome;
-  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  if (phone !== 'phone1' && !num) return <span className="text-slate-300">—</span>;
   return (
     <select
       value={value}
@@ -202,10 +218,10 @@ function LeadStatusCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2
 }
 
 /** Inline remark input scoped to one phone, showing the latest phone-specific remark. */
-function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone2' }) {
+function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const [text, setText] = useState('');
   const update = useUpdatePhoneOutcome();
-  const num = phone === 'phone1' ? lead.phone : lead.altPhone;
+  const num = phoneNumberOf(lead, phone);
   const phoneRemarks = (lead.remarks ?? []).filter((r) => r.phone === phone || (phone === 'phone1' && !r.phone));
   const last = phoneRemarks[phoneRemarks.length - 1];
 
@@ -216,7 +232,7 @@ function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: 'phone1' | 'phone
     update.mutate({ id: lead._id, phone, remark: t }, { onError: (e) => toast.error(apiError(e)) });
   }
 
-  if (phone === 'phone2' && !num) return <span className="text-slate-300">—</span>;
+  if (phone !== 'phone1' && !num) return <span className="text-slate-300">—</span>;
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-1">
@@ -311,6 +327,10 @@ const COLUMNS: ColumnDef[] = [
   { id: 'callstatus2', label: 'Call Status 2', cell: (l) => <CallStatusCell lead={l} phone="phone2" /> },
   { id: 'leadstatus2', label: 'Lead Status 2', cell: (l) => <LeadStatusCell lead={l} phone="phone2" /> },
   { id: 'remark2', label: 'Remark 2', cell: (l) => <PhoneRemarkCell lead={l} phone="phone2" /> },
+  { id: 'phone3', label: 'Phone 3', cell: (l) => <PhoneNumberCell lead={l} phone="phone3" /> },
+  { id: 'callstatus3', label: 'Call Status 3', cell: (l) => <CallStatusCell lead={l} phone="phone3" /> },
+  { id: 'leadstatus3', label: 'Lead Status 3', cell: (l) => <LeadStatusCell lead={l} phone="phone3" /> },
+  { id: 'remark3', label: 'Remark 3', cell: (l) => <PhoneRemarkCell lead={l} phone="phone3" /> },
   { id: 'lastContacted', label: 'Last Contacted', sortField: 'lastContactedAt', muted: true, cell: (l) => (l.lastContactedAt ? fmtDate(l.lastContactedAt) : '—') },
   { id: 'followup', label: 'Follow-up', cell: (l) => <FollowUpCell lead={l} /> },
   { id: 'added', label: 'Added', sortField: 'createdAt', muted: true, cell: (l) => fmtDate(l.createdAt) },
@@ -668,6 +688,7 @@ function PriorityCell({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
 function PhoneSummaryBadges({ lead }: { lead: Lead }) {
   const p1 = lead.phone1Outcome?.callStatus ?? 'pending';
   const p2 = lead.phone2Outcome?.callStatus ?? 'pending';
+  const p3 = lead.phone3Outcome?.callStatus ?? 'pending';
   return (
     <div className="space-y-0.5">
       <Badge className={`${PHONE_CALL_STATUS_COLORS[p1]} text-[10px]`}>
@@ -676,6 +697,11 @@ function PhoneSummaryBadges({ lead }: { lead: Lead }) {
       {lead.altPhone && (
         <Badge className={`${PHONE_CALL_STATUS_COLORS[p2]} text-[10px]`}>
           P2: {PHONE_CALL_STATUS_LABELS[p2]}
+        </Badge>
+      )}
+      {lead.altPhone2 && (
+        <Badge className={`${PHONE_CALL_STATUS_COLORS[p3]} text-[10px]`}>
+          P3: {PHONE_CALL_STATUS_LABELS[p3]}
         </Badge>
       )}
     </div>
@@ -689,11 +715,11 @@ function PhoneOutcomePanel({
   isAdmin,
 }: {
   lead: Lead;
-  phone: 'phone1' | 'phone2';
+  phone: PhoneSlot;
   isAdmin: boolean;
 }) {
-  const phoneNumber = phone === 'phone1' ? lead.phone : lead.altPhone!;
-  const slot = (phone === 'phone1' ? lead.phone1Outcome : lead.phone2Outcome) ?? {
+  const phoneNumber = phoneNumberOf(lead, phone) ?? '';
+  const slot = phoneSlotOf(lead, phone) ?? {
     callStatus: 'pending' as PhoneCallStatus,
     leadOutcome: 'none' as PhoneLeadOutcome,
   };
@@ -717,7 +743,7 @@ function PhoneOutcomePanel({
     update.mutate({ id: lead._id, phone, remark: t }, { onError: (e) => toast.error(apiError(e)) });
   }
 
-  const label = phone === 'phone1' ? 'Phone 1' : 'Phone 2';
+  const label = phone === 'phone1' ? 'Phone 1' : phone === 'phone2' ? 'Phone 2' : 'Phone 3';
 
   if (isAdmin) {
     return (
@@ -851,9 +877,10 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
   return (
     <div className="space-y-4 bg-slate-50 p-4 dark:bg-slate-900/50">
       {/* Per-phone call tracking */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <PhoneOutcomePanel lead={lead} phone="phone1" isAdmin={isAdmin} />
         {lead.altPhone && <PhoneOutcomePanel lead={lead} phone="phone2" isAdmin={isAdmin} />}
+        {lead.altPhone2 && <PhoneOutcomePanel lead={lead} phone="phone3" isAdmin={isAdmin} />}
       </div>
 
       {/* Contact details, timestamps, and full remarks timeline */}
@@ -887,7 +914,7 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
                   <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
                     {r.byName || 'Unknown'}
                     {r.byRole ? ` (${r.byRole === 'superadmin' ? 'Admin' : 'User'})` : ''}
-                    {r.phone ? ` · ${r.phone === 'phone1' ? 'Phone 1' : 'Phone 2'}` : ''} ·{' '}
+                    {r.phone ? ` · ${r.phone === 'phone1' ? 'Phone 1' : r.phone === 'phone2' ? 'Phone 2' : 'Phone 3'}` : ''} ·{' '}
                     {fmtDateTime(r.createdAt)}
                   </p>
                 </div>

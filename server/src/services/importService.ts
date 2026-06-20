@@ -92,6 +92,7 @@ export async function importLeads(
 
     const phone = phones[0] ?? '';
     const altPhone = phones.find((p) => p !== phone) ?? '';
+    const altPhone2 = phones.find((p) => p !== phone && p !== altPhone) ?? '';
 
     if (!name && !phone) return; // skip fully empty rows silently
     if (!phone) {
@@ -106,6 +107,7 @@ export async function importLeads(
       name: name || 'Unknown',
       phone,
       altPhone,
+      altPhone2,
       email: EMAIL_RE.test(email) ? email : '',
       title: pick(row, ['title', 'jobtitle', 'designation', 'role']),
       company: pickFirst(row, [['company', 'companyname'], ['organization', 'organisation', 'business']]),

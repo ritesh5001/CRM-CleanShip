@@ -30,6 +30,7 @@ export interface Lead {
   name: string;
   phone: string;
   altPhone?: string;
+  altPhone2?: string;
   email?: string;
   title?: string;
   company?: string;
@@ -51,6 +52,7 @@ export interface Lead {
   notes?: string;
   phone1Outcome?: PhoneOutcome;
   phone2Outcome?: PhoneOutcome;
+  phone3Outcome?: PhoneOutcome;
   createdAt: string;
 }
 
@@ -71,7 +73,7 @@ export interface Remark {
   byName?: string;
   byRole?: string;
   createdAt: string;
-  phone?: 'phone1' | 'phone2' | null;
+  phone?: 'phone1' | 'phone2' | 'phone3' | null;
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';

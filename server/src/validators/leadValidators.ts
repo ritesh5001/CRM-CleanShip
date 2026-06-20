@@ -5,6 +5,7 @@ export const createLeadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone is required'),
   altPhone: z.string().optional().default(''),
+  altPhone2: z.string().optional().default(''),
   email: z.string().email().optional().or(z.literal('')).default(''),
   title: z.string().optional().default(''),
   company: z.string().optional().default(''),
@@ -22,6 +23,7 @@ export const updateLeadSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
   altPhone: z.string().optional(),
+  altPhone2: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   title: z.string().optional(),
   company: z.string().optional(),
@@ -59,7 +61,7 @@ export const bulkDeleteSchema = z.object({
 
 export const phoneOutcomeSchema = z
   .object({
-    phone: z.enum(['phone1', 'phone2']),
+    phone: z.enum(['phone1', 'phone2', 'phone3']),
     callStatus: z.enum(PHONE_CALL_STATUSES).optional(),
     leadOutcome: z.enum(PHONE_LEAD_OUTCOMES).optional(),
     remark: z.string().optional().default(''),

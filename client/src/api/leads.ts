@@ -208,7 +208,7 @@ export function useBulkDeleteLeads() {
 
 export interface PhoneOutcomeVars {
   id: string;
-  phone: 'phone1' | 'phone2';
+  phone: 'phone1' | 'phone2' | 'phone3';
   callStatus?: PhoneCallStatus;
   leadOutcome?: PhoneLeadOutcome;
   remark?: string;
@@ -225,7 +225,8 @@ export function useUpdatePhoneOutcome() {
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ['leads'] });
       const snapshots = patchLeadInLists(qc, vars.id, (l) => {
-        const slotKey = vars.phone === 'phone1' ? 'phone1Outcome' : 'phone2Outcome';
+        const slotKey =
+          vars.phone === 'phone1' ? 'phone1Outcome' : vars.phone === 'phone2' ? 'phone2Outcome' : 'phone3Outcome';
         const prevSlot = l[slotKey] ?? { callStatus: 'pending' as PhoneCallStatus, leadOutcome: 'none' as PhoneLeadOutcome };
         const updatedSlot = {
           ...prevSlot,
@@ -235,9 +236,10 @@ export function useUpdatePhoneOutcome() {
 
         const p1cs = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.callStatus ?? 'pending';
         const p2cs = (vars.phone === 'phone2' ? updatedSlot : l.phone2Outcome)?.callStatus ?? 'pending';
+        const p3cs = (vars.phone === 'phone3' ? updatedSlot : l.phone3Outcome)?.callStatus ?? 'pending';
         const newCallStatus =
-          p1cs === 'connected' || p2cs === 'connected' ? 'done' :
-          p1cs !== 'pending' || p2cs !== 'pending' ? 'not_done' : 'pending';
+          p1cs === 'connected' || p2cs === 'connected' || p3cs === 'connected' ? 'done' :
+          p1cs !== 'pending' || p2cs !== 'pending' || p3cs !== 'pending' ? 'not_done' : 'pending';
 
         const next: Lead = { ...l, [slotKey]: updatedSlot, callStatus: newCallStatus };
 
@@ -250,10 +252,11 @@ export function useUpdatePhoneOutcome() {
 
         const p1lo = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.leadOutcome ?? 'none';
         const p2lo = (vars.phone === 'phone2' ? updatedSlot : l.phone2Outcome)?.leadOutcome ?? 'none';
-        if (p1lo === 'interested' || p2lo === 'interested') {
+        const p3lo = (vars.phone === 'phone3' ? updatedSlot : l.phone3Outcome)?.leadOutcome ?? 'none';
+        if (p1lo === 'interested' || p2lo === 'interested' || p3lo === 'interested') {
           next.status = 'interested';
           next.qualified = true;
-        } else if (p1lo === 'not_interested' || p2lo === 'not_interested') {
+        } else if (p1lo === 'not_interested' || p2lo === 'not_interested' || p3lo === 'not_interested') {
           next.status = 'not_interested';
           next.qualified = false;
         }
