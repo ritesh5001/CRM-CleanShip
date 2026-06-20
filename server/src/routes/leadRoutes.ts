@@ -25,6 +25,7 @@ router.get('/export', ctrl.exportLeads);
 
 // Superadmin-only writes / assignment / import.
 router.post('/', requireRole('superadmin'), validate(createLeadSchema), ctrl.createLead);
+router.post('/import/preview', requireRole('superadmin'), uploadSpreadsheet, ctrl.previewImportHandler);
 router.post('/import', requireRole('superadmin'), uploadSpreadsheet, ctrl.importLeadsHandler);
 router.patch('/bulk-assign', requireRole('superadmin'), validate(bulkAssignSchema), ctrl.bulkAssignLeads);
 router.post('/bulk-delete', requireRole('superadmin'), validate(bulkDeleteSchema), ctrl.bulkDeleteLeads);

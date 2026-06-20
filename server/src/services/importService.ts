@@ -43,6 +43,31 @@ export interface ImportResult {
   errors: { row: number; message: string }[];
 }
 
+/** Maps a CRM field id → the chosen spreadsheet header (admin-defined during import). */
+export type FieldMapping = Partial<Record<string, string>>;
+
+export interface ImportPreview {
+  headers: string[];
+  totalRows: number;
+  sample: Record<string, string>[];
+}
+
+/** Reads a CSV/Excel buffer and returns its header row, row count, and a small sample. */
+export function previewImport(buffer: Buffer): ImportPreview {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
+  const headers = (aoa[0] ?? []).map((h) => String(h).trim()).filter(Boolean);
+  const sample = aoa.slice(1, 4).map((r) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      obj[h] = String((r as unknown[])[i] ?? '').trim();
+    });
+    return obj;
+  });
+  return { headers, totalRows: Math.max(0, aoa.length - 1), sample };
+}
+
 /**
  * Parses a CSV/Excel buffer and bulk-creates leads. Header matching is
  * case/space/punctuation-insensitive and supports common CRM and Apollo.io
@@ -57,11 +82,19 @@ export async function importLeads(
   buffer: Buffer,
   fileName: string,
   uploadedBy: string,
-  assignedTo?: string
+  assignedTo?: string,
+  mapping?: FieldMapping
 ): Promise<ImportResult> {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: '' });
+
+  const useMapping = !!mapping && Object.values(mapping).some(Boolean);
+  // Reads a field by its admin-mapped header (exact match).
+  const mapped = (row: RawRow, field: string) => {
+    const header = mapping?.[field];
+    return header ? clean(row[header]) : '';
+  };
 
   const errors: { row: number; message: string }[] = [];
   const docs: Record<string, unknown>[] = [];
@@ -69,31 +102,67 @@ export async function importLeads(
   rows.forEach((row, idx) => {
     const rowNum = idx + 2; // account for header row
 
-    // Name: a single name column, otherwise First + Last name.
-    let name = pick(row, ['name', 'fullname', 'leadname', 'customername', 'contactname']);
-    if (!name) {
-      const first = pick(row, ['firstname', 'fname', 'givenname']);
-      const last = pick(row, ['lastname', 'lname', 'surname', 'familyname']);
-      name = [first, last].filter(Boolean).join(' ').trim();
+    let name: string;
+    let phone: string;
+    let altPhone: string;
+    let altPhone2: string;
+    let email: string;
+    let title: string;
+    let company: string;
+    let city: string;
+    let state: string;
+    let country: string;
+    let source: string;
+    let industry: string;
+    let notes: string;
+
+    if (useMapping) {
+      // Admin chose exactly which column maps to which field.
+      name = mapped(row, 'name');
+      phone = mapped(row, 'phone');
+      altPhone = mapped(row, 'altPhone');
+      altPhone2 = mapped(row, 'altPhone2');
+      email = mapped(row, 'email').toLowerCase();
+      title = mapped(row, 'title');
+      company = mapped(row, 'company');
+      city = mapped(row, 'city');
+      state = mapped(row, 'state');
+      country = mapped(row, 'country');
+      source = mapped(row, 'source');
+      industry = mapped(row, 'industry');
+      notes = mapped(row, 'notes');
+    } else {
+      // Auto-detect from common CRM/Apollo header names.
+      name = pick(row, ['name', 'fullname', 'leadname', 'customername', 'contactname']);
+      if (!name) {
+        const first = pick(row, ['firstname', 'fname', 'givenname']);
+        const last = pick(row, ['lastname', 'lname', 'surname', 'familyname']);
+        name = [first, last].filter(Boolean).join(' ').trim();
+      }
+      const phones = [
+        ['phone', 'phonenumber', 'contact', 'contactnumber'],
+        ['mobile', 'mobilephone', 'cell', 'cellphone'],
+        ['workdirectphone', 'directphone', 'workphone'],
+        ['corporatephone', 'companyphone', 'officephone'],
+        ['otherphone', 'homephone'],
+        ['altphone', 'alternatephone', 'alternativephone', 'phone2', 'secondaryphone', 'secondphone', '2ndphone'],
+        ['altphone2', 'alternatephone2', 'phone3', 'thirdphone', '3rdphone'],
+      ]
+        .map((group) => pick(row, group))
+        .filter(Boolean);
+      phone = phones[0] ?? '';
+      altPhone = phones.find((p) => p !== phone) ?? '';
+      altPhone2 = phones.find((p) => p !== phone && p !== altPhone) ?? '';
+      email = pick(row, ['email', 'emailaddress']).toLowerCase();
+      title = pick(row, ['title', 'jobtitle', 'designation', 'role']);
+      company = pickFirst(row, [['company', 'companyname'], ['organization', 'organisation', 'business']]);
+      city = pick(row, ['city', 'location', 'area']);
+      state = pick(row, ['state', 'province', 'region']);
+      country = pick(row, ['country']);
+      source = pick(row, ['source', 'leadsource']);
+      industry = pick(row, ['industry']);
+      notes = pick(row, ['notes', 'remark', 'remarks', 'comment']);
     }
-
-    // Collect all phone columns in priority order (mobile/direct first), then
-    // use the first as the primary and the first distinct one as altPhone.
-    const phones = [
-      ['phone', 'phonenumber', 'contact', 'contactnumber'],
-      ['mobile', 'mobilephone', 'cell', 'cellphone'],
-      ['workdirectphone', 'directphone', 'workphone'],
-      ['corporatephone', 'companyphone', 'officephone'],
-      ['otherphone', 'homephone'],
-      ['altphone', 'alternatephone', 'alternativephone', 'phone2', 'secondaryphone', 'secondphone', '2ndphone'],
-      ['altphone2', 'alternatephone2', 'phone3', 'thirdphone', '3rdphone'],
-    ]
-      .map((group) => pick(row, group))
-      .filter(Boolean);
-
-    const phone = phones[0] ?? '';
-    const altPhone = phones.find((p) => p !== phone) ?? '';
-    const altPhone2 = phones.find((p) => p !== phone && p !== altPhone) ?? '';
 
     if (!name && !phone) return; // skip fully empty rows silently
     if (!phone) {
@@ -101,23 +170,20 @@ export async function importLeads(
       return;
     }
 
-    const email = pick(row, ['email', 'emailaddress']).toLowerCase();
-    const industry = pick(row, ['industry']);
-
     docs.push({
       name: name || 'Unknown',
       phone,
       altPhone,
       altPhone2,
       email: EMAIL_RE.test(email) ? email : '',
-      title: pick(row, ['title', 'jobtitle', 'designation', 'role']),
-      company: pickFirst(row, [['company', 'companyname'], ['organization', 'organisation', 'business']]),
-      city: pick(row, ['city', 'location', 'area']),
-      state: pick(row, ['state', 'province', 'region']),
-      country: pick(row, ['country']),
+      title,
+      company,
+      city,
+      state,
+      country,
       tags: industry ? [industry] : [],
-      source: pick(row, ['source', 'leadsource']) || 'import',
-      notes: pick(row, ['notes', 'remark', 'remarks', 'comment']),
+      source: source || 'import',
+      notes,
       status: assignedTo ? 'assigned' : 'new',
       assignedTo: assignedTo || undefined,
       assignedAt: assignedTo ? new Date() : undefined,

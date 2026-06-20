@@ -289,13 +289,38 @@ export function useUpdatePhoneOutcome() {
   });
 }
 
+export interface ImportPreview {
+  headers: string[];
+  totalRows: number;
+  sample: Record<string, string>[];
+}
+
+/** Uploads a file just to read its header row + a sample, for column mapping. */
+export async function previewImportFile(file: File): Promise<ImportPreview> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const { data } = await api.post('/leads/import/preview', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data.preview as ImportPreview;
+}
+
 export function useImportLeads() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, assignedTo }: { file: File; assignedTo?: string }) => {
+    mutationFn: async ({
+      file,
+      assignedTo,
+      mapping,
+    }: {
+      file: File;
+      assignedTo?: string;
+      mapping?: Record<string, string>;
+    }) => {
       const fd = new FormData();
       fd.append('file', file);
       if (assignedTo) fd.append('assignedTo', assignedTo);
+      if (mapping && Object.keys(mapping).length) fd.append('mapping', JSON.stringify(mapping));
       const { data } = await api.post('/leads/import', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });

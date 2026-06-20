@@ -6,7 +6,8 @@ import type { PhoneCallStatus, PhoneLeadOutcome } from '../models/Lead.js';
 import { User } from '../models/User.js';
 import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
-import { importLeads } from '../services/importService.js';
+import { importLeads, previewImport } from '../services/importService.js';
+import type { FieldMapping } from '../services/importService.js';
 import { notify } from '../services/notificationService.js';
 import { idOf } from '../utils/idOf.js';
 import type { PhoneOutcomeInput } from '../validators/leadValidators.js';
@@ -268,12 +269,30 @@ export const bulkDeleteLeads = asyncHandler(async (req: Request, res: Response) 
   res.json({ success: true, deleted: result.deletedCount });
 });
 
+// POST /leads/import/preview — returns the file's headers + a small sample for column mapping.
+export const previewImportHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.file) throw ApiError.badRequest('No file uploaded (field name must be "file")');
+  const preview = previewImport(req.file.buffer);
+  if (!preview.headers.length) throw ApiError.badRequest('No header row found in the file');
+  res.json({ success: true, preview });
+});
+
 export const importLeadsHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) throw ApiError.badRequest('No file uploaded (field name must be "file")');
   const assignedTo = typeof req.body.assignedTo === 'string' && req.body.assignedTo ? req.body.assignedTo : undefined;
   if (assignedTo) await assertTelecaller(assignedTo);
 
-  const result = await importLeads(req.file.buffer, req.file.originalname, req.user!.id, assignedTo);
+  // Optional admin-defined column mapping (sent as a JSON string in the multipart body).
+  let mapping: FieldMapping | undefined;
+  if (typeof req.body.mapping === 'string' && req.body.mapping.trim()) {
+    try {
+      mapping = JSON.parse(req.body.mapping) as FieldMapping;
+    } catch {
+      throw ApiError.badRequest('Invalid column mapping');
+    }
+  }
+
+  const result = await importLeads(req.file.buffer, req.file.originalname, req.user!.id, assignedTo, mapping);
 
   if (assignedTo && result.successCount > 0) {
     await notify({
