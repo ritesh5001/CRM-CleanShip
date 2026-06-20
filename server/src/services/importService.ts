@@ -119,6 +119,8 @@ export async function importLeads(
     if (useMapping) {
       // Admin chose exactly which column maps to which field.
       name = mapped(row, 'name');
+      const lastName = mapped(row, 'lastName');
+      if (lastName) name = [name, lastName].filter(Boolean).join(' ').trim();
       phone = mapped(row, 'phone');
       altPhone = mapped(row, 'altPhone');
       altPhone2 = mapped(row, 'altPhone2');
@@ -140,7 +142,7 @@ export async function importLeads(
         name = [first, last].filter(Boolean).join(' ').trim();
       }
       const phones = [
-        ['phone', 'phonenumber', 'contact', 'contactnumber'],
+        ['phone', 'phonenumber', 'contact', 'contactnumber', 'phone1'],
         ['mobile', 'mobilephone', 'cell', 'cellphone'],
         ['workdirectphone', 'directphone', 'workphone'],
         ['corporatephone', 'companyphone', 'officephone'],

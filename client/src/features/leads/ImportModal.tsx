@@ -16,7 +16,8 @@ interface Props {
 
 // CRM target fields the file columns can be mapped to.
 const FIELDS: { id: string; label: string; required?: boolean }[] = [
-  { id: 'name', label: 'Name', required: true },
+  { id: 'name', label: 'Name / First Name', required: true },
+  { id: 'lastName', label: 'Last Name' },
   { id: 'phone', label: 'Phone', required: true },
   { id: 'altPhone', label: 'Alt Phone' },
   { id: 'altPhone2', label: 'Alt Phone 2' },
@@ -33,8 +34,9 @@ const FIELDS: { id: string; label: string; required?: boolean }[] = [
 
 // Header aliases used to pre-guess the mapping (mirrors the server's auto-detection).
 const ALIASES: Record<string, string[]> = {
-  name: ['name', 'fullname', 'leadname', 'customername', 'contactname'],
-  phone: ['phone', 'phonenumber', 'contact', 'contactnumber', 'mobile', 'mobilephone', 'cell', 'cellphone'],
+  name: ['name', 'fullname', 'leadname', 'customername', 'contactname', 'firstname', 'fname', 'givenname'],
+  lastName: ['lastname', 'lname', 'surname', 'familyname'],
+  phone: ['phone', 'phonenumber', 'contact', 'contactnumber', 'phone1', 'mobile', 'mobilephone', 'cell', 'cellphone'],
   altPhone: ['altphone', 'alternatephone', 'alternativephone', 'phone2', 'secondaryphone', 'secondphone', '2ndphone'],
   altPhone2: ['altphone2', 'alternatephone2', 'phone3', 'thirdphone', '3rdphone'],
   email: ['email', 'emailaddress'],
