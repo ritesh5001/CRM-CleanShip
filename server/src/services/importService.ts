@@ -86,6 +86,7 @@ export async function importLeads(
       ['corporatephone', 'companyphone', 'officephone'],
       ['otherphone', 'homephone'],
       ['altphone', 'alternatephone', 'alternativephone', 'phone2', 'secondaryphone', 'secondphone', '2ndphone'],
+      ['altphone2', 'alternatephone2', 'phone3', 'thirdphone', '3rdphone'],
     ]
       .map((group) => pick(row, group))
       .filter(Boolean);

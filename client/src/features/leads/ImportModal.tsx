@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -7,6 +7,7 @@ import { Label, Select } from '@/components/ui/Field';
 import { useImportLeads } from '@/api/leads';
 import { useTelecallers } from '@/api/users';
 import { apiError } from '@/api/client';
+import { downloadImportTemplate } from '@/lib/csv';
 
 interface Props {
   open: boolean;
@@ -67,6 +68,14 @@ export function ImportModal({ open, onClose }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              New here? Download the template, fill it in, then upload it.
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => downloadImportTemplate()}>
+              <Download size={14} /> Template
+            </Button>
+          </div>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-8 hover:border-brand-400 dark:border-slate-600">
             <UploadCloud className="text-slate-400 dark:text-slate-500" size={28} />
             <span className="text-sm text-slate-500 dark:text-slate-400">
@@ -79,8 +88,9 @@ export function ImportModal({ open, onClose }: Props) {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </label>
-          <p className="text-xs text-slate-400">
-            Recognized columns: name, phone, email, company, city, source, notes.
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Recognized columns: Name, Phone, Alt Phone, Alt Phone 2, Email, Title, Company, City, State, Country,
+            Source, Industry, Notes. Only Name &amp; Phone are required.
           </p>
           <div>
             <Label>Assign all to (optional)</Label>
