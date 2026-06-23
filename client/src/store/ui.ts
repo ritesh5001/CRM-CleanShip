@@ -15,6 +15,7 @@ interface UiState {
   colWidths: Record<string, number>;
   colOrder: string[]; // persisted order of the contacts table data columns
   hiddenCols: string[]; // contacts table columns the user has hidden
+  showPhoneNumbers: boolean; // reveal the actual phone digits in the contacts table phone columns
   toggleSidebar: () => void;
   toggleFilters: () => void;
   setDensity: (d: Density) => void;
@@ -24,6 +25,7 @@ interface UiState {
   setColOrder: (o: string[]) => void;
   toggleCol: (id: string) => void;
   resetCols: () => void;
+  toggleShowPhoneNumbers: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -36,6 +38,7 @@ export const useUiStore = create<UiState>()(
       colWidths: {},
       colOrder: [],
       hiddenCols: [],
+      showPhoneNumbers: true,
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -50,6 +53,7 @@ export const useUiStore = create<UiState>()(
             : [...s.hiddenCols, id],
         })),
       resetCols: () => set({ colOrder: [], hiddenCols: [], colWidths: {} }),
+      toggleShowPhoneNumbers: () => set((s) => ({ showPhoneNumbers: !s.showPhoneNumbers })),
     }),
     { name: 'crm-ui' }
   )

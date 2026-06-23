@@ -12,6 +12,8 @@ import {
   Columns3,
   GripVertical,
   RotateCcw,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
@@ -157,10 +159,22 @@ function phoneSlotOf(lead: Lead, phone: PhoneSlot) {
   return phone === 'phone1' ? lead.phone1Outcome : phone === 'phone2' ? lead.phone2Outcome : lead.phone3Outcome;
 }
 
-/** Phone number with copy/call/WhatsApp actions, or a dash when empty. */
+/** Phone number with copy/call/WhatsApp actions, or a dash when empty.
+ *  The actual digits are revealed when the "Show numbers" top-bar toggle is on. */
 function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const num = phoneNumberOf(lead, phone);
-  return num ? <PhoneActions phone={num} /> : <span className="text-slate-300">—</span>;
+  const showNumbers = useUiStore((s) => s.showPhoneNumbers);
+  if (!num) return <span className="text-slate-300">—</span>;
+  return (
+    <div className="space-y-0.5">
+      {showNumbers && (
+        <span className="block truncate text-xs font-medium text-slate-700 dark:text-slate-200" title={num}>
+          {num}
+        </span>
+      )}
+      <PhoneActions phone={num} />
+    </div>
+  );
 }
 
 /** Inline call-status dropdown for one phone (connected / not connected / voice mail / incorrect no). */
@@ -344,6 +358,26 @@ function resolveOrder(stored: string[]): string[] {
   const valid = stored.filter((id) => COLUMN_MAP[id]);
   const missing = DEFAULT_DATA_COL_IDS.filter((id) => !valid.includes(id));
   return [...valid, ...missing];
+}
+
+/** Top-bar toggle that reveals/hides the phone number digits in the table's phone columns. */
+export function ShowNumbersToggle() {
+  const show = useUiStore((s) => s.showPhoneNumbers);
+  const toggle = useUiStore((s) => s.toggleShowPhoneNumbers);
+  return (
+    <button
+      onClick={toggle}
+      title={show ? 'Hide phone numbers' : 'Show phone numbers'}
+      className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+        show
+          ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
+          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+      }`}
+    >
+      {show ? <Eye size={13} /> : <EyeOff size={13} />}
+      Numbers
+    </button>
+  );
 }
 
 /** Dropdown to show/hide table columns. Rendered in the contacts top bar. */
