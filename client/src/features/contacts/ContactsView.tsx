@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus, Upload, Search, Download, X, SlidersHorizontal, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -63,18 +63,27 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   const setDensity = useUiStore((s) => s.setDensity);
   const filtersCollapsed = useUiStore((s) => s.filtersCollapsed);
   const toggleFilters = useUiStore((s) => s.toggleFilters);
+  const setContactFilters = useUiStore((s) => s.setContactFilters);
 
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [callStatus, setCallStatus] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
-  const [qualifiedChip, setQualifiedChip] = useState(false);
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  // Restore this view's last-used filters (persisted per user in localStorage) on mount.
+  const saved = useMemo(() => useUiStore.getState().contactFilters[mode], [mode]);
+
+  const [search, setSearch] = useState(saved.search);
+  const [status, setStatus] = useState(saved.status);
+  const [callStatus, setCallStatus] = useState(saved.callStatus);
+  const [assignedTo, setAssignedTo] = useState(saved.assignedTo);
+  const [qualifiedChip, setQualifiedChip] = useState(saved.qualifiedChip);
+  const [sortBy, setSortBy] = useState(saved.sortBy);
+  const [order, setOrder] = useState<'asc' | 'desc'>(saved.order);
+  const [page, setPage] = useState(saved.page);
+  const [limit, setLimit] = useState(saved.limit);
   const [selected, setSelected] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
+
+  // Persist filter/sort/paging changes so they survive a page refresh.
+  useEffect(() => {
+    setContactFilters(mode, { search, status, callStatus, assignedTo, qualifiedChip, sortBy, order, page, limit });
+  }, [mode, search, status, callStatus, assignedTo, qualifiedChip, sortBy, order, page, limit, setContactFilters]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
