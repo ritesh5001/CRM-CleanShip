@@ -321,19 +321,42 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
 
   if (callStatus) {
     (slot as { callStatus: PhoneCallStatus }).callStatus = callStatus;
+
+    // Any call-status change counts as contact activity — stamp the last-contacted date.
+    lead.lastContactedAt = new Date();
+
+    const telecaller = idOf(lead.assignedTo) || req.user!.id;
+
     if (callStatus === 'connected') {
-      lead.lastContactedAt = new Date();
       // Default a follow-up to 2 weeks out when a call connects and none is set yet.
       if (!lead.nextFollowUpAt) {
         const followUpAt = new Date();
         followUpAt.setDate(followUpAt.getDate() + 14);
         lead.nextFollowUpAt = followUpAt;
-        const telecaller = idOf(lead.assignedTo) || req.user!.id;
         await FollowUp.create({
           lead: lead._id,
           telecaller,
           scheduledAt: followUpAt,
           notes: 'Auto-scheduled 2 weeks after connected call',
+        });
+      }
+    } else if (callStatus === 'not_connected') {
+      // Reschedule a retry follow-up one week out when the call didn't connect.
+      const followUpAt = new Date();
+      followUpAt.setDate(followUpAt.getDate() + 7);
+      lead.nextFollowUpAt = followUpAt;
+      // Update the latest pending follow-up if one exists, else create a fresh one.
+      const pending = await FollowUp.findOne({ lead: lead._id, status: 'pending' }).sort({ scheduledAt: -1 });
+      if (pending) {
+        pending.scheduledAt = followUpAt;
+        pending.notes = 'Auto-rescheduled 1 week after not-connected call';
+        await pending.save();
+      } else {
+        await FollowUp.create({
+          lead: lead._id,
+          telecaller,
+          scheduledAt: followUpAt,
+          notes: 'Auto-scheduled 1 week after not-connected call',
         });
       }
     }

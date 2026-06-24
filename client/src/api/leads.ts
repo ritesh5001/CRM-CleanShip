@@ -243,11 +243,21 @@ export function useUpdatePhoneOutcome() {
 
         const next: Lead = { ...l, [slotKey]: updatedSlot, callStatus: newCallStatus };
 
-        // Mirror the server: a connecting call seeds a follow-up 2 weeks out if none exists.
-        if (vars.callStatus === 'connected' && !l.nextFollowUpAt) {
-          const followUpAt = new Date();
-          followUpAt.setDate(followUpAt.getDate() + 14);
-          next.nextFollowUpAt = followUpAt.toISOString();
+        // Mirror the server's call-status side effects for instant feedback.
+        if (vars.callStatus) {
+          // Any call-status change stamps the last-contacted date.
+          next.lastContactedAt = new Date().toISOString();
+          if (vars.callStatus === 'connected' && !l.nextFollowUpAt) {
+            // A connecting call seeds a follow-up 2 weeks out if none exists.
+            const followUpAt = new Date();
+            followUpAt.setDate(followUpAt.getDate() + 14);
+            next.nextFollowUpAt = followUpAt.toISOString();
+          } else if (vars.callStatus === 'not_connected') {
+            // A not-connected call reschedules the follow-up one week out.
+            const followUpAt = new Date();
+            followUpAt.setDate(followUpAt.getDate() + 7);
+            next.nextFollowUpAt = followUpAt.toISOString();
+          }
         }
 
         const p1lo = (vars.phone === 'phone1' ? updatedSlot : l.phone1Outcome)?.leadOutcome ?? 'none';
