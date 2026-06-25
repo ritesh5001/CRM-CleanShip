@@ -82,6 +82,17 @@ export const setUserTarget = asyncHandler(async (req: Request, res: Response) =>
   res.json({ success: true, user });
 });
 
+// Assign (or clear, with '') the Twilio caller-ID number a telecaller dials from.
+export const setUserTwilioNumber = asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findOneAndUpdate(
+    { _id: req.params.id, role: 'telecaller' },
+    { $set: { twilioNumber: req.body.twilioNumber } },
+    { new: true }
+  );
+  if (!user) throw ApiError.notFound('Telecaller not found');
+  res.json({ success: true, user });
+});
+
 export const resetUserPassword = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ _id: req.params.id, role: 'telecaller' }).select('+passwordHash');
   if (!user) throw ApiError.notFound('Telecaller not found');

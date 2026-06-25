@@ -11,6 +11,7 @@ import {
   buildDialTwiml,
   generateVoiceToken,
   isEnabled as twilioEnabled,
+  resolveCallerId,
 } from '../services/twilioService.js';
 
 /** Normalizes a phone to a dial-able form, keeping a single leading '+'. */
@@ -125,30 +126,44 @@ export const listCalls = asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, ...paginated(calls, total, pg) });
 });
 
-// GET /calls/config — tells the client whether in-app (Twilio) calling is available.
-export const getCallConfig = asyncHandler(async (_req: Request, res: Response) => {
-  res.json({ success: true, enabled: await twilioEnabled() });
+// GET /calls/config — tells the client whether in-app (Twilio) calling is
+// available *for this user*. A telecaller needs a Twilio number assigned by the
+// admin; a superadmin falls back to the default caller ID.
+export const getCallConfig = asyncHandler(async (req: Request, res: Response) => {
+  const enabled = (await twilioEnabled()) && Boolean(await resolveCallerId(req.user!.id));
+  res.json({ success: true, enabled });
 });
 
 // GET /calls/token — mints a short-lived Twilio Voice access token for the
-// authenticated user's browser softphone.
+// authenticated user's browser softphone (only if they have a caller ID).
 export const getVoiceToken = asyncHandler(async (req: Request, res: Response) => {
   if (!(await twilioEnabled())) throw ApiError.serviceUnavailable('Calling is not configured');
+  if (!(await resolveCallerId(req.user!.id))) {
+    throw ApiError.forbidden('No calling number is assigned to you. Ask an admin to assign one.');
+  }
   const { token, identity } = await generateVoiceToken(req.user!.id);
   res.json({ success: true, token, identity });
 });
 
 // POST /calls/voice — Twilio fetches this when the browser places a call. Returns
-// TwiML that dials the lead's number from our caller id and records the call.
+// TwiML that dials the lead from the *calling telecaller's* assigned number and
+// records the call. The caller's identity rides in `From` (`client:<userId>`),
+// baked into the signed access token, so the caller ID is server-authoritative.
 // Public endpoint, protected by Twilio signature verification (see callRoutes).
 export const handleVoice = asyncHandler(async (req: Request, res: Response) => {
-  const to = cleanPhone(typeof req.body.To === 'string' ? req.body.To : '');
   res.type('text/xml');
+  const to = cleanPhone(typeof req.body.To === 'string' ? req.body.To : '');
   if (!/^\+?\d{6,15}$/.test(to)) {
     res.send('<Response><Say>Sorry, the number is invalid.</Say></Response>');
     return;
   }
-  res.send(await buildDialTwiml(to));
+  const callerUserId = (typeof req.body.From === 'string' ? req.body.From : '').replace(/^client:/, '');
+  const callerId = callerUserId ? await resolveCallerId(callerUserId) : '';
+  if (!callerId) {
+    res.send('<Response><Say>No calling number is assigned to your account.</Say></Response>');
+    return;
+  }
+  res.send(await buildDialTwiml(to, callerId));
 });
 
 // POST /calls/recording — Twilio posts the recording details when ready. Stages

@@ -12,6 +12,7 @@ export interface IUser {
   role: UserRole;
   isActive: boolean;
   dailyTarget: number;
+  twilioNumber: string; // Twilio caller ID assigned to this telecaller (E.164), '' if none
   createdBy?: Types.ObjectId;
   lastLoginAt?: Date;
   createdAt: Date;
@@ -35,6 +36,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     role: { type: String, enum: USER_ROLES, required: true, default: 'telecaller' },
     isActive: { type: Boolean, default: true },
     dailyTarget: { type: Number, default: 50, min: 0 },
+    twilioNumber: { type: String, trim: true, default: '' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
     lastLoginAt: { type: Date },
   },

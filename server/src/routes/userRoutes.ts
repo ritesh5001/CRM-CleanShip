@@ -8,6 +8,7 @@ import {
   resetPasswordSchema,
   setStatusSchema,
   setTargetSchema,
+  setTwilioNumberSchema,
   updateUserSchema,
 } from '../validators/userValidators.js';
 
@@ -23,6 +24,7 @@ router.put('/:id', validate(updateUserSchema), ctrl.updateUser);
 router.delete('/:id', ctrl.deleteUser);
 router.patch('/:id/status', validate(setStatusSchema), ctrl.setUserStatus);
 router.patch('/:id/target', validate(setTargetSchema), ctrl.setUserTarget);
+router.patch('/:id/twilio-number', validate(setTwilioNumberSchema), ctrl.setUserTwilioNumber);
 router.patch('/:id/reset-password', validate(resetPasswordSchema), ctrl.resetUserPassword);
 
 export default router;

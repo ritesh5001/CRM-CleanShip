@@ -12,5 +12,6 @@ router.use(authenticate, requireRole('superadmin'));
 
 router.get('/twilio', ctrl.getTwilioIntegration);
 router.put('/twilio', validate(updateTwilioSchema), ctrl.updateTwilioIntegration);
+router.get('/twilio/numbers', ctrl.listTwilioNumbers);
 
 export default router;

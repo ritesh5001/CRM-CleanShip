@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Phone, Copy, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Phone, Copy, CheckCircle2, AlertCircle, Users as UsersIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTwilioIntegration, useUpdateTwilioIntegration, type TwilioIntegrationUpdate } from '@/api/integrations';
+import {
+  useTwilioIntegration,
+  useUpdateTwilioIntegration,
+  useTwilioNumbers,
+  type TwilioIntegrationUpdate,
+} from '@/api/integrations';
+import { useTelecallers, useSetTelecallerTwilioNumber } from '@/api/users';
 import { apiError } from '@/api/client';
 import { Button } from '@/components/ui/Button';
-import { Input, Label } from '@/components/ui/Field';
+import { Input, Label, Select } from '@/components/ui/Field';
 import { Badge, Card, Spinner } from '@/components/ui/Misc';
 
 interface FormState {
@@ -49,6 +55,90 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         }`}
       />
     </button>
+  );
+}
+
+/** Assign a Twilio number (caller ID) to each telecaller. */
+function NumberAssignmentCard({ configured }: { configured: boolean }) {
+  const numbers = useTwilioNumbers(configured);
+  const telecallers = useTelecallers({ limit: 200 });
+  const assign = useSetTelecallerTwilioNumber();
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const users = telecallers.data?.data ?? [];
+  const numberList = numbers.data ?? [];
+
+  function handleAssign(id: string, twilioNumber: string) {
+    setSavingId(id);
+    assign.mutate(
+      { id, twilioNumber },
+      {
+        onSuccess: () => toast.success(twilioNumber ? 'Number assigned' : 'Number cleared'),
+        onError: (e) => toast.error(apiError(e)),
+        onSettled: () => setSavingId(null),
+      }
+    );
+  }
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex items-center gap-3">
+        <span className="rounded-lg bg-brand-100 p-2 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+          <UsersIcon size={20} />
+        </span>
+        <div>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Caller numbers</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Assign a Twilio number to each telecaller — they'll dial leads from that number.
+          </p>
+        </div>
+      </div>
+
+      {!configured ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Save valid Twilio credentials above first to load your numbers.
+        </p>
+      ) : numbers.isLoading || telecallers.isLoading ? (
+        <Spinner />
+      ) : numberList.length === 0 ? (
+        <p className="text-sm text-amber-600">
+          No voice-capable numbers found on your Twilio account. Buy a number in the Twilio console.
+        </p>
+      ) : users.length === 0 ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">No telecallers yet. Add users first.</p>
+      ) : (
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {users.map((u) => {
+            // Keep a stale/unknown assigned number visible as an option.
+            const known = numberList.some((n) => n.phoneNumber === u.twilioNumber);
+            return (
+              <div key={u._id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{u.name}</p>
+                  <p className="truncate text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    className="w-56"
+                    value={u.twilioNumber ?? ''}
+                    disabled={savingId === u._id}
+                    onChange={(e) => handleAssign(u._id, e.target.value)}
+                  >
+                    <option value="">— Not assigned —</option>
+                    {!known && u.twilioNumber && <option value={u.twilioNumber}>{u.twilioNumber} (current)</option>}
+                    {numberList.map((n) => (
+                      <option key={n.phoneNumber} value={n.phoneNumber}>
+                        {n.friendlyName === n.phoneNumber ? n.phoneNumber : `${n.friendlyName} (${n.phoneNumber})`}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -210,7 +300,7 @@ export function IntegrationsPage() {
             />
           </div>
           <div>
-            <Label>Caller ID (your Twilio number)</Label>
+            <Label>Default caller ID (admin / fallback number)</Label>
             <Input
               value={form.callerId}
               onChange={(e) => set('callerId', e.target.value)}
@@ -251,6 +341,8 @@ export function IntegrationsPage() {
           </Button>
         </div>
       </Card>
+
+      <NumberAssignmentCard configured={data?.configured ?? false} />
     </div>
   );
 }

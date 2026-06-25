@@ -28,6 +28,25 @@ export interface TwilioIntegrationUpdate {
   publicServerUrl?: string;
 }
 
+export interface TwilioNumber {
+  phoneNumber: string;
+  friendlyName: string;
+}
+
+/** Voice-capable numbers owned by the Twilio account (for assigning to telecallers). */
+export function useTwilioNumbers(enabled: boolean) {
+  return useQuery({
+    queryKey: ['twilio-numbers'],
+    enabled,
+    queryFn: async () => {
+      const { data } = await api.get<{ success: boolean; data: TwilioNumber[] }>(
+        '/integrations/twilio/numbers'
+      );
+      return data.data;
+    },
+  });
+}
+
 export function useTwilioIntegration() {
   return useQuery({
     queryKey: ['twilio-integration'],

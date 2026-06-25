@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
-import { TWILIO_KEY } from '../services/twilioService.js';
+import { TWILIO_KEY, listNumbers } from '../services/twilioService.js';
 import type { UpdateTwilioInput } from '../validators/integrationValidators.js';
 
 // Fields the admin form sends that are kept secret: blanks mean "leave unchanged",
@@ -64,4 +64,11 @@ export const updateTwilioIntegration = asyncHandler(async (req: Request, res: Re
   await doc.save();
 
   res.json({ success: true, data: sanitizeTwilio(doc) });
+});
+
+// GET /integrations/twilio/numbers (superadmin) — voice-capable numbers owned by
+// the Twilio account, for assigning to telecallers.
+export const listTwilioNumbers = asyncHandler(async (_req: Request, res: Response) => {
+  const numbers = await listNumbers();
+  res.json({ success: true, data: numbers });
 });

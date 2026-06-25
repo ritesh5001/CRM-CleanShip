@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
+import { User } from '../models/User.js';
 
 const { AccessToken } = twilio.jwt;
 const { VoiceGrant } = AccessToken;
@@ -31,6 +32,33 @@ function publicBase(s: IntegrationDoc | null): string | undefined {
 }
 
 /**
+ * Resolves the caller-ID (Twilio number) a given user dials from:
+ *  - a telecaller uses the number the admin assigned them (else none → can't call);
+ *  - a superadmin uses their assigned number, else the global default caller ID.
+ */
+export async function resolveCallerId(userId: string): Promise<string> {
+  const user = await User.findById(userId).select('twilioNumber role');
+  const assigned = (user?.twilioNumber || '').trim();
+  if (assigned) return assigned;
+  if (user?.role === 'superadmin') {
+    const s = await getTwilioSettings();
+    return (s?.callerId || '').trim();
+  }
+  return '';
+}
+
+/** Lists the account's voice-capable phone numbers (for the admin assignment UI). */
+export async function listNumbers(): Promise<{ phoneNumber: string; friendlyName: string }[]> {
+  const s = await getTwilioSettings();
+  if (!s || !s.accountSid || !s.authToken) return [];
+  const client = twilio(s.accountSid, s.authToken);
+  const nums = await client.incomingPhoneNumbers.list({ limit: 100 });
+  return nums
+    .filter((n) => n.capabilities?.voice)
+    .map((n) => ({ phoneNumber: n.phoneNumber, friendlyName: n.friendlyName || n.phoneNumber }));
+}
+
+/**
  * Mints a short-lived Voice access token for a telecaller's browser softphone.
  * Throws if calling isn't fully configured (callers should check `isEnabled`).
  */
@@ -43,11 +71,11 @@ export async function generateVoiceToken(identity: string): Promise<{ token: str
 }
 
 /**
- * Builds the TwiML that dials the lead from the browser leg. Records the call
- * (dual channel) when recording is enabled and asks Twilio to POST the recording
- * back to us when ready.
+ * Builds the TwiML that dials the lead from the browser leg, using `callerId`
+ * (the calling telecaller's assigned Twilio number). Records the call (dual
+ * channel) when recording is enabled and asks Twilio to POST the recording back.
  */
-export async function buildDialTwiml(to: string): Promise<string> {
+export async function buildDialTwiml(to: string, callerId: string): Promise<string> {
   const s = await getTwilioSettings();
   const response = new VoiceResponse();
   const recordingCallback = (() => {
@@ -55,7 +83,7 @@ export async function buildDialTwiml(to: string): Promise<string> {
     return base ? `${base}/api/v1/calls/recording` : undefined;
   })();
 
-  const dialOptions: Record<string, unknown> = { callerId: s?.callerId };
+  const dialOptions: Record<string, unknown> = { callerId };
   if (s?.recordCalls) {
     dialOptions.record = 'record-from-answer-dual';
     if (recordingCallback) {

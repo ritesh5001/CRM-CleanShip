@@ -66,3 +66,13 @@ export function useDeleteTelecaller() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
 }
+
+/** Assign (or clear, with '') the Twilio caller-ID number a telecaller dials from. */
+export function useSetTelecallerTwilioNumber() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, twilioNumber }: { id: string; twilioNumber: string }) =>
+      (await api.patch(`/users/${id}/twilio-number`, { twilioNumber })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
+}

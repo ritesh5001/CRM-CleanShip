@@ -11,6 +11,7 @@ export interface User {
   role: Role;
   isActive: boolean;
   dailyTarget: number;
+  twilioNumber?: string;
   lastLoginAt?: string;
   createdAt: string;
 }
