@@ -41,6 +41,9 @@ const callLogSchema = new Schema(
     notes: { type: String, default: '' },
     durationSec: { type: Number, default: 0, min: 0 },
     nextFollowUpAt: { type: Date },
+    // Twilio call correlation (set when the call was placed via the browser softphone).
+    twilioCallSid: { type: String, index: true },
+    recordingUrl: { type: String },
   },
   { timestamps: true }
 );

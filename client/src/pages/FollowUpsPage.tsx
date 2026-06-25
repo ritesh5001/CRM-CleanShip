@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Phone, MessageCircle, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useFollowUps, useMarkFollowUpDone } from '@/api/followups';
+import { useCallConfig } from '@/api/calls';
+import { useCallStore } from '@/store/call';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
 import { fmtDateTime, isOverdue, telLink, whatsappLink } from '@/lib/format';
@@ -19,6 +21,10 @@ export function FollowUpsPage() {
   const [scope, setScope] = useState('today');
   const { data, isLoading } = useFollowUps({ scope });
   const markDone = useMarkFollowUpDone();
+  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const startCall = useCallStore((s) => s.startCall);
+  const callPhase = useCallStore((s) => s.phase);
+  const callBusy = callPhase === 'connecting' || callPhase === 'ringing' || callPhase === 'in_call';
 
   async function handleDone(id: string) {
     try {
@@ -73,11 +79,22 @@ export function FollowUpsPage() {
                   <div className="flex gap-1.5">
                     {lead?.phone && (
                       <>
-                        <a href={telLink(lead.phone)}>
-                          <Button size="sm" variant="secondary">
+                        {callingEnabled ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={callBusy}
+                            onClick={() => startCall({ leadId: lead._id, name: lead.name, phone: lead.phone })}
+                          >
                             <Phone size={14} /> Call
                           </Button>
-                        </a>
+                        ) : (
+                          <a href={telLink(lead.phone)}>
+                            <Button size="sm" variant="secondary">
+                              <Phone size={14} /> Call
+                            </Button>
+                          </a>
+                        )}
                         <a href={whatsappLink(lead.phone)} target="_blank" rel="noreferrer">
                           <Button size="sm" variant="ghost">
                             <MessageCircle size={14} className="text-emerald-600" />

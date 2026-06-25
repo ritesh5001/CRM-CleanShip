@@ -5,6 +5,7 @@ import {
   Star,
   ListChecks,
   CalendarClock,
+  Plug,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/types';
@@ -22,6 +23,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
+    { to: '/integrations', label: 'Integrations', icon: Plug },
   ],
   telecaller: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },

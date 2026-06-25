@@ -21,6 +21,9 @@ export const env = {
   // Public URL of this service, used by the keep-alive self-ping. Render injects
   // RENDER_EXTERNAL_URL automatically; SELF_URL can override it.
   selfUrl: process.env.SELF_URL ?? process.env.RENDER_EXTERNAL_URL,
+  // Fallback public base URL Twilio uses to reach our webhooks when the admin
+  // panel's "Public server URL" is left blank. (Render injects RENDER_EXTERNAL_URL.)
+  publicUrl: process.env.PUBLIC_SERVER_URL ?? process.env.SELF_URL ?? process.env.RENDER_EXTERNAL_URL,
   superadmin: {
     name: process.env.SUPERADMIN_NAME ?? 'Super Admin',
     email: process.env.SUPERADMIN_EMAIL ?? 'admin@cleanship.com',

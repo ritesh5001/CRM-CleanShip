@@ -7,6 +7,7 @@ import callRoutes from './callRoutes.js';
 import followUpRoutes from './followUpRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import reportRoutes from './reportRoutes.js';
+import integrationRoutes from './integrationRoutes.js';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/calls', callRoutes);
 router.use('/followups', followUpRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
+router.use('/integrations', integrationRoutes);
 
 export default router;

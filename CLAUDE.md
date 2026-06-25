@@ -48,8 +48,13 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
-- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt`.
-  `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
+- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt, twilioCallSid,
+  recordingUrl`. `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
+- **CallRecording** — `callSid, recordingUrl, durationSec, status`. Staging area for async Twilio
+  recording/status webhooks, keyed by CallSid; `logCall` attaches it to the CallLog.
+- **Integration** — singleton settings doc (`key:'twilio'`): `enabled, accountSid, authToken,
+  apiKeySid, apiKeySecret, twimlAppSid, callerId, recordCalls, publicServerUrl`. Managed from the
+  admin Integrations panel (secrets never returned raw).
 - **FollowUp** — `lead, telecaller, scheduledAt, status(pending|done|missed), notes, callLog`.
 - **Notification** — `recipient, type, title, message, link, isRead`.
 - **ImportBatch** — `fileName, uploadedBy, totalRows, successCount, errorCount, errors[]`.
@@ -67,12 +72,17 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 - **Tasks:** `GET /tasks`, `POST /tasks` (admin), `GET /tasks/:id`, `PUT /tasks/:id` (admin),
   `PATCH /tasks/:id/status`, `DELETE /tasks/:id` (admin).
 - **Calls:** `GET /calls`, `POST /calls` — telecaller call update: `callStatus: done|not_done`,
-  optional `disposition` (required when done), optional `remark` + `nextFollowUpAt`. Done → logs a
-  CallLog, maps lead status, appends remark, and promotes to a Lead (`qualified`) when
-  interested/converted. Not-done → records the attempt only.
+  optional `disposition` (required when done), optional `remark` + `nextFollowUpAt`, optional
+  `twilioCallSid`. Done → logs a CallLog, maps lead status, appends remark, and promotes to a Lead
+  (`qualified`) when interested/converted. Not-done → records the attempt only.
+  Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
+  `GET /calls/token` (mints a Voice access token); public Twilio webhooks `POST /calls/voice`
+  (returns Dial TwiML), `POST /calls/recording`, `POST /calls/status` — all signature-verified.
 - **Follow-ups:** `GET /followups?scope=today|upcoming|overdue|all`, `PATCH /followups/:id/done`.
 - **Notifications:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`.
 - **Reports:** `GET /reports/overview` (admin), `GET /reports/me` (telecaller).
+- **Integrations (superadmin):** `GET /integrations/twilio`, `PUT /integrations/twilio` — Twilio
+  calling credentials/toggles (secrets masked on read).
 
 Response shapes: success → `{ success: true, ... }`; lists → `{ success, data, pagination }`;
 errors → `{ success: false, message, details? }` via the central `errorHandler`.
@@ -116,12 +126,33 @@ Seeded logins: `admin@cleanship.com / Admin@12345`, `telecaller@cleanship.com / 
 ## Environment (`server/.env`)
 
 `PORT`, `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CLIENT_ORIGIN`, and
-`SUPERADMIN_NAME/EMAIL/PASSWORD` (seed). See `server/.env.example`.
+`SUPERADMIN_NAME/EMAIL/PASSWORD` (seed). Twilio is **not** configured via env (see Telephony); the
+only related var is the optional `PUBLIC_SERVER_URL` webhook fallback. See `server/.env.example`.
+
+## Telephony (Twilio browser softphone)
+
+Optional. Twilio is configured at runtime from the **admin panel** (superadmin → Integrations,
+`pages/IntegrationsPage.tsx`), persisted to the `Integration` singleton (`key:'twilio'`), **not** env
+vars. When `enabled` + all creds are present, clicking **Call** dials the lead from the telecaller's
+browser via the **Twilio Voice JS SDK** (`@twilio/voice-sdk`); otherwise Call falls back to plain
+`tel:` links. Flow: client mints a token (`GET /calls/token`) and creates a `Device`
+(`client/src/store/call.ts`), connects with the lead's number → Twilio fetches Dial TwiML from
+`POST /calls/voice` → audio in the browser (`features/calls/CallBar.tsx`) → on hangup the
+`CallDispositionModal` logs the outcome via the existing `POST /calls` (with `twilioCallSid` +
+auto-measured duration). Recording is a panel toggle; when on, Twilio's `POST /calls/recording`
+webhook stages the recording in the `CallRecording` collection (keyed by CallSid) which `logCall`
+attaches to the CallLog. Server bits: `services/twilioService.ts` reads settings from the DB per
+request (token/TwiML/signature); webhooks are signature-verified in `routes/callRoutes.ts`; admin
+CRUD in `controllers/integrationController.ts` (secrets masked on read — `authToken`/`apiKeySecret`
+returned only as `*Set` flags). One-time Twilio-console setup: create an API Key + a TwiML App whose
+Voice URL is the panel's shown `voiceWebhookUrl` (`https://<server>/api/v1/calls/voice`); set the
+panel's "Public server URL" (or `PUBLIC_SERVER_URL`) so recording webhooks resolve — use ngrok
+locally.
 
 ## Notes for future work
 
-- Telephony is intentionally manual (tel:/WhatsApp links). A provider (Twilio/Exotel) could be added
-  behind `callController` later.
+- Incoming calls aren't handled (the VoiceGrant is `incomingAllow:false`); add browser inbound +
+  call transfer behind `twilioService` later if needed.
 - `xlsx` has an unpatched npm ReDoS advisory; import is superadmin-only. Consider the SheetJS CDN
   build if hardening is needed.
 - Notifications poll every 30s; could move to WebSockets/SSE for realtime.

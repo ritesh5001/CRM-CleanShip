@@ -13,6 +13,24 @@ export function useCalls(params: { lead?: string; telecaller?: string; page?: nu
   });
 }
 
+/** Whether in-app (Twilio) calling is configured on the server. */
+export function useCallConfig() {
+  return useQuery({
+    queryKey: ['call-config'],
+    queryFn: async () => {
+      const { data } = await api.get<{ success: boolean; enabled: boolean }>('/calls/config');
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Fetches a fresh Twilio Voice access token for the browser softphone. */
+export async function fetchVoiceToken(): Promise<string> {
+  const { data } = await api.get<{ success: boolean; token: string; identity: string }>('/calls/token');
+  return data.token;
+}
+
 // Mirror of the server's DISPOSITION_TO_LEAD_STATUS for optimistic row updates.
 const DISPOSITION_TO_LEAD_STATUS: Record<Disposition, Lead['status']> = {
   interested: 'interested',
@@ -33,6 +51,7 @@ interface LogCallVars {
   remark?: string;
   durationSec?: number;
   nextFollowUpAt?: string;
+  twilioCallSid?: string;
 }
 
 /** Optimistically patch a single lead across every cached `['leads', …]` list. */

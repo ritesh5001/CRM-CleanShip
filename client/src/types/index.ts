@@ -111,6 +111,8 @@ export interface CallLog {
   notes?: string;
   durationSec?: number;
   nextFollowUpAt?: string;
+  twilioCallSid?: string;
+  recordingUrl?: string;
   createdAt: string;
 }
 

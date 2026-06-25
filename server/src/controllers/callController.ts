@@ -2,10 +2,24 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { CallLog, DISPOSITION_TO_LEAD_STATUS, type Disposition } from '../models/CallLog.js';
+import { CallRecording } from '../models/CallRecording.js';
 import { Lead } from '../models/Lead.js';
 import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
 import type { LogCallInput } from '../validators/callValidators.js';
+import {
+  buildDialTwiml,
+  generateVoiceToken,
+  isEnabled as twilioEnabled,
+} from '../services/twilioService.js';
+
+/** Normalizes a phone to a dial-able form, keeping a single leading '+'. */
+function cleanPhone(raw: string): string {
+  const trimmed = raw.trim().replace(/[^\d+]/g, '');
+  return trimmed.startsWith('+')
+    ? `+${trimmed.slice(1).replace(/\+/g, '')}`
+    : trimmed.replace(/\+/g, '');
+}
 
 // POST /calls — telecaller records a call update on one of their contacts.
 // callStatus 'done'  → logs a CallLog with an outcome (disposition) and may promote to a Lead.
@@ -33,7 +47,18 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
       notes: body.notes || body.remark,
       durationSec: body.durationSec,
       nextFollowUpAt: body.nextFollowUpAt,
+      twilioCallSid: body.twilioCallSid,
     });
+
+    // Attach a Twilio recording if its webhook already landed (see CallRecording).
+    if (body.twilioCallSid) {
+      const rec = await CallRecording.findOne({ callSid: body.twilioCallSid });
+      if (rec) {
+        if (rec.recordingUrl) callLog.recordingUrl = rec.recordingUrl;
+        if (!body.durationSec && rec.durationSec) callLog.durationSec = rec.durationSec;
+        await callLog.save();
+      }
+    }
 
     lead.status = DISPOSITION_TO_LEAD_STATUS[disposition] as typeof lead.status;
     lead.callStatus = 'done';
@@ -98,4 +123,67 @@ export const listCalls = asyncHandler(async (req: Request, res: Response) => {
   ]);
 
   res.json({ success: true, ...paginated(calls, total, pg) });
+});
+
+// GET /calls/config — tells the client whether in-app (Twilio) calling is available.
+export const getCallConfig = asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ success: true, enabled: await twilioEnabled() });
+});
+
+// GET /calls/token — mints a short-lived Twilio Voice access token for the
+// authenticated user's browser softphone.
+export const getVoiceToken = asyncHandler(async (req: Request, res: Response) => {
+  if (!(await twilioEnabled())) throw ApiError.serviceUnavailable('Calling is not configured');
+  const { token, identity } = await generateVoiceToken(req.user!.id);
+  res.json({ success: true, token, identity });
+});
+
+// POST /calls/voice — Twilio fetches this when the browser places a call. Returns
+// TwiML that dials the lead's number from our caller id and records the call.
+// Public endpoint, protected by Twilio signature verification (see callRoutes).
+export const handleVoice = asyncHandler(async (req: Request, res: Response) => {
+  const to = cleanPhone(typeof req.body.To === 'string' ? req.body.To : '');
+  res.type('text/xml');
+  if (!/^\+?\d{6,15}$/.test(to)) {
+    res.send('<Response><Say>Sorry, the number is invalid.</Say></Response>');
+    return;
+  }
+  res.send(await buildDialTwiml(to));
+});
+
+// POST /calls/recording — Twilio posts the recording details when ready. Stages
+// them in CallRecording (keyed by CallSid) and patches any existing CallLog.
+// Public endpoint, protected by Twilio signature verification (see callRoutes).
+export const handleRecording = asyncHandler(async (req: Request, res: Response) => {
+  const callSid = typeof req.body.CallSid === 'string' ? req.body.CallSid : '';
+  const recordingUrl = typeof req.body.RecordingUrl === 'string' ? req.body.RecordingUrl : undefined;
+  const durationSec = req.body.RecordingDuration ? Number(req.body.RecordingDuration) : undefined;
+
+  if (callSid && recordingUrl) {
+    await CallRecording.updateOne(
+      { callSid },
+      { $set: { recordingUrl, ...(durationSec ? { durationSec } : {}) } },
+      { upsert: true }
+    );
+    // If the disposition was already submitted, patch its CallLog too.
+    await CallLog.updateOne({ twilioCallSid: callSid }, { $set: { recordingUrl } });
+  }
+  res.json({ success: true });
+});
+
+// POST /calls/status — optional call status callback; stores authoritative
+// duration/status keyed by CallSid. Public, Twilio-signature protected.
+export const handleStatus = asyncHandler(async (req: Request, res: Response) => {
+  const callSid = typeof req.body.CallSid === 'string' ? req.body.CallSid : '';
+  const status = typeof req.body.CallStatus === 'string' ? req.body.CallStatus : undefined;
+  const durationSec = req.body.CallDuration ? Number(req.body.CallDuration) : undefined;
+
+  if (callSid) {
+    await CallRecording.updateOne(
+      { callSid },
+      { $set: { ...(status ? { status } : {}), ...(durationSec ? { durationSec } : {}) } },
+      { upsert: true }
+    );
+  }
+  res.json({ success: true });
 });

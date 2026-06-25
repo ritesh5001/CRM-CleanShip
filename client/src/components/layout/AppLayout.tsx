@@ -1,12 +1,26 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LogOut, Phone, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
+import { useCallConfig } from '@/api/calls';
+import { useCallStore } from '@/store/call';
+import { CallBar } from '@/features/calls/CallBar';
+import { CallDispositionModal } from '@/features/calls/CallDispositionModal';
 import { NAV } from './nav';
 import { NotificationBell } from './NotificationBell';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
+  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const initDevice = useCallStore((s) => s.initDevice);
+
+  // Warm up the Twilio softphone once we know calling is configured (no mic
+  // prompt yet — that only happens on the first actual call).
+  useEffect(() => {
+    if (callingEnabled) void initDevice();
+  }, [callingEnabled, initDevice]);
+
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const theme = useUiStore((s) => s.theme);
@@ -135,6 +149,10 @@ export function AppLayout() {
           </button>
         </nav>
       </div>
+
+      {/* Global Twilio softphone UI (no-op until a call is placed). */}
+      <CallBar />
+      <CallDispositionModal />
     </div>
   );
 }

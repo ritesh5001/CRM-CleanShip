@@ -20,6 +20,8 @@ import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
 import { Button } from '@/components/ui/Button';
 import { apiError } from '@/api/client';
 import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead, useUpdatePhoneOutcome } from '@/api/leads';
+import { useCallConfig } from '@/api/calls';
+import { useCallStore } from '@/store/call';
 import {
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
@@ -117,10 +119,17 @@ function FollowUpCell({ lead }: { lead: Lead }) {
   );
 }
 
-/** Copy (left) · Call · WhatsApp actions for a phone number. */
-function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
+/** Copy (left) · Call · WhatsApp actions for a phone number.
+ *  When Twilio calling is enabled and a `lead` is provided, Call dials in-app
+ *  (browser softphone); otherwise it falls back to a `tel:` link. */
+function PhoneActions({ phone, lead, big }: { phone: string; lead?: Lead; big?: boolean }) {
   const size = big ? 16 : 15;
   const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
+  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const startCall = useCallStore((s) => s.startCall);
+  const phase = useCallStore((s) => s.phase);
+  const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
+  const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`;
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
@@ -130,9 +139,20 @@ function PhoneActions({ phone, big }: { phone: string; big?: boolean }) {
       >
         <Copy size={size} />
       </button>
-      <a href={telLink(phone)} title={phone} className={`${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`}>
-        <Phone size={size} />
-      </a>
+      {callingEnabled && lead ? (
+        <button
+          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone })}
+          disabled={busy}
+          title={busy ? 'A call is in progress' : `Call ${phone}`}
+          className={`${callCls} disabled:opacity-40`}
+        >
+          <Phone size={size} />
+        </button>
+      ) : (
+        <a href={telLink(phone)} title={phone} className={callCls}>
+          <Phone size={size} />
+        </a>
+      )}
       <a
         href={whatsappLink(phone)}
         target="_blank"
@@ -172,7 +192,7 @@ function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
           {num}
         </span>
       )}
-      <PhoneActions phone={num} />
+      <PhoneActions phone={num} lead={lead} />
     </div>
   );
 }
@@ -784,7 +804,7 @@ function PhoneOutcomePanel({
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
         <div className="flex items-center gap-2 flex-wrap">
-          <PhoneActions phone={phoneNumber} />
+          <PhoneActions phone={phoneNumber} lead={lead} />
           <Badge className={PHONE_CALL_STATUS_COLORS[slot.callStatus]}>
             {PHONE_CALL_STATUS_LABELS[slot.callStatus]}
           </Badge>
@@ -807,7 +827,7 @@ function PhoneOutcomePanel({
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-      <PhoneActions phone={phoneNumber} />
+      <PhoneActions phone={phoneNumber} lead={lead} />
       <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
         {PHONE_CALL_OPTIONS.map((cs) => (
           <button
@@ -1081,7 +1101,7 @@ function MobileCard({
             {lead.company ? ` · ${lead.company}` : ''}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <PhoneActions phone={lead.phone} big />
+            <PhoneActions phone={lead.phone} lead={lead} big />
             {isAdmin && onAssign && <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />}
             <PhoneSummaryBadges lead={lead} />
             <button onClick={() => setOpen((o) => !o)} className="ml-auto text-slate-400">
