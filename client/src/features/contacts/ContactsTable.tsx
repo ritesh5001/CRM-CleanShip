@@ -22,6 +22,7 @@ import { apiError } from '@/api/client';
 import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead, useUpdatePhoneOutcome } from '@/api/leads';
 import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
+import { CallHistory } from '@/features/calls/CallHistory';
 import {
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
@@ -976,6 +977,9 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
           </div>
         </div>
       </div>
+
+      {/* Call log & recordings for this contact */}
+      <CallHistory leadId={lead._id} />
     </div>
   );
 }

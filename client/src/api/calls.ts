@@ -31,6 +31,12 @@ export async function fetchVoiceToken(): Promise<string> {
   return data.token;
 }
 
+/** Downloads a call's recording (auth-proxied) and returns a playable object URL. */
+export async function fetchRecordingObjectUrl(callId: string): Promise<string> {
+  const { data } = await api.get(`/calls/${callId}/recording`, { responseType: 'blob' });
+  return URL.createObjectURL(data as Blob);
+}
+
 // Mirror of the server's DISPOSITION_TO_LEAD_STATUS for optimistic row updates.
 const DISPOSITION_TO_LEAD_STATUS: Record<Disposition, Lead['status']> = {
   interested: 'interested',

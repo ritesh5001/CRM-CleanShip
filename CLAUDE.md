@@ -77,8 +77,10 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   `twilioCallSid`. Done → logs a CallLog, maps lead status, appends remark, and promotes to a Lead
   (`qualified`) when interested/converted. Not-done → records the attempt only.
   Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
-  `GET /calls/token` (mints a Voice access token); public Twilio webhooks `POST /calls/voice`
-  (returns Dial TwiML), `POST /calls/recording`, `POST /calls/status` — all signature-verified.
+  `GET /calls/token` (mints a Voice access token), `GET /calls/:id/recording` (auth-proxied
+  recording audio stream — telecaller scoped to own calls); public Twilio webhooks
+  `POST /calls/voice` (returns Dial TwiML), `POST /calls/recording`, `POST /calls/status` — all
+  signature-verified.
 - **Follow-ups:** `GET /followups?scope=today|upcoming|overdue|all`, `PATCH /followups/:id/done`.
 - **Notifications:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`.
 - **Reports:** `GET /reports/overview` (admin), `GET /reports/me` (telecaller).
@@ -148,7 +150,10 @@ lead's number → Twilio fetches Dial TwiML from `POST /calls/voice` → audio i
 `CallDispositionModal` logs the outcome via the existing `POST /calls` (with `twilioCallSid` +
 auto-measured duration). Recording is a panel toggle; when on, Twilio's `POST /calls/recording`
 webhook stages the recording in the `CallRecording` collection (keyed by CallSid) which `logCall`
-attaches to the CallLog. Server bits: `services/twilioService.ts` reads settings from the DB per
+attaches to the CallLog. Playback: recordings are streamed back through `GET /calls/:id/recording`
+(server fetches the Twilio media with Basic auth and proxies it — creds never reach the browser);
+the client downloads it as a blob and plays it (`features/calls/CallHistory.tsx`, shown in the
+expanded contact row). Server bits: `services/twilioService.ts` reads settings from the DB per
 request (token/TwiML/signature); webhooks are signature-verified in `routes/callRoutes.ts`; admin
 CRUD in `controllers/integrationController.ts` (secrets masked on read — `authToken`/`apiKeySecret`
 returned only as `*Set` flags). One-time Twilio-console setup: create an API Key + a TwiML App whose

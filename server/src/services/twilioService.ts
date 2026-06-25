@@ -47,6 +47,25 @@ export async function resolveCallerId(userId: string): Promise<string> {
   return '';
 }
 
+/**
+ * Fetches a call recording's audio from Twilio, authenticated with the account
+ * credentials. Twilio recording media requires HTTP Basic auth, so this must be
+ * proxied server-side — never expose the recording URL/creds to the browser.
+ */
+export async function fetchRecordingMedia(
+  recordingUrl: string
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const s = await getTwilioSettings();
+  if (!s || !s.accountSid || !s.authToken) return null;
+  // The recording resource URL serves media when suffixed with .mp3 (or .wav).
+  const mediaUrl = /\.(mp3|wav)$/i.test(recordingUrl) ? recordingUrl : `${recordingUrl}.mp3`;
+  const auth = Buffer.from(`${s.accountSid}:${s.authToken}`).toString('base64');
+  const resp = await fetch(mediaUrl, { headers: { Authorization: `Basic ${auth}` } });
+  if (!resp.ok) return null;
+  const buffer = Buffer.from(await resp.arrayBuffer());
+  return { buffer, contentType: resp.headers.get('content-type') || 'audio/mpeg' };
+}
+
 /** Lists the account's voice-capable phone numbers (for the admin assignment UI). */
 export async function listNumbers(): Promise<{ phoneNumber: string; friendlyName: string }[]> {
   const s = await getTwilioSettings();

@@ -30,6 +30,7 @@ router.use(authenticate);
 
 router.get('/config', ctrl.getCallConfig);
 router.get('/token', ctrl.getVoiceToken);
+router.get('/:id/recording', ctrl.streamRecording);
 router.get('/', ctrl.listCalls);
 router.post('/', validate(logCallSchema), ctrl.logCall);
 

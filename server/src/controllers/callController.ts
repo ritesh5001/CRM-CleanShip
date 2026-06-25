@@ -12,6 +12,7 @@ import {
   generateVoiceToken,
   isEnabled as twilioEnabled,
   resolveCallerId,
+  fetchRecordingMedia,
 } from '../services/twilioService.js';
 
 /** Normalizes a phone to a dial-able form, keeping a single leading '+'. */
@@ -124,6 +125,24 @@ export const listCalls = asyncHandler(async (req: Request, res: Response) => {
   ]);
 
   res.json({ success: true, ...paginated(calls, total, pg) });
+});
+
+// GET /calls/:id/recording — streams a call's recording audio, proxied + authed
+// against Twilio. Telecallers can only access their own calls.
+export const streamRecording = asyncHandler(async (req: Request, res: Response) => {
+  const call = await CallLog.findById(req.params.id);
+  if (!call) throw ApiError.notFound('Call not found');
+  if (req.user!.role === 'telecaller' && String(call.telecaller) !== req.user!.id) {
+    throw ApiError.forbidden('This call is not yours');
+  }
+  if (!call.recordingUrl) throw ApiError.notFound('No recording for this call');
+
+  const media = await fetchRecordingMedia(call.recordingUrl);
+  if (!media) throw ApiError.serviceUnavailable('Could not fetch the recording');
+
+  res.setHeader('Content-Type', media.contentType);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.send(media.buffer);
 });
 
 // GET /calls/config — tells the client whether in-app (Twilio) calling is
