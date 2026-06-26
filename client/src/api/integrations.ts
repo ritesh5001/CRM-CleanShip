@@ -10,6 +10,7 @@ export interface TwilioIntegration {
   twimlAppSid: string;
   callerId: string;
   recordCalls: boolean;
+  defaultCountryCode: string;
   publicServerUrl: string;
   authTokenSet: boolean;
   apiKeySecretSet: boolean;
@@ -25,6 +26,7 @@ export interface TwilioIntegrationUpdate {
   twimlAppSid?: string;
   callerId?: string;
   recordCalls?: boolean;
+  defaultCountryCode?: string;
   publicServerUrl?: string;
 }
 

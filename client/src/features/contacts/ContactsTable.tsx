@@ -32,7 +32,9 @@ import {
   PHONE_LEAD_OUTCOME_LABELS,
   PRIORITY_COLORS,
 } from '@/lib/constants';
-import { cleanPhone, fmtDate, fmtDateTime, telLink, toDateInput, whatsappLink } from '@/lib/format';
+import { cleanPhone, fmtDate, fmtDateTime, fmtRelative, telLink, toDateInput, toE164, whatsappLink } from '@/lib/format';
+import { countryCallingCode } from '@/lib/countries';
+import { CountryTime } from '@/components/CountryTime';
 import { useUiStore } from '@/store/ui';
 import type { Density, Lead, PhoneCallStatus, PhoneLeadOutcome, Role, User } from '@/types';
 
@@ -126,11 +128,14 @@ function FollowUpCell({ lead }: { lead: Lead }) {
 function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; lead?: Lead; slot?: PhoneSlot; big?: boolean }) {
   const size = big ? 16 : 15;
   const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
-  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const callConfig = useCallConfig().data;
+  const callingEnabled = callConfig?.enabled ?? false;
   const startCall = useCallStore((s) => s.startCall);
   const phase = useCallStore((s) => s.phase);
   const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
   const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`;
+  // Prefer the contact's country dialling code, else the admin's default code.
+  const dialNumber = toE164(phone, countryCallingCode(lead?.country) ?? callConfig?.defaultCountryCode);
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
@@ -142,7 +147,7 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
       </button>
       {callingEnabled && lead ? (
         <button
-          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone, phoneSlot: slot })}
+          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone: dialNumber, phoneSlot: slot })}
           disabled={busy}
           title={busy ? 'A call is in progress' : `Call ${phone}`}
           className={`${callCls} disabled:opacity-40`}
@@ -206,23 +211,30 @@ function CallStatusCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const value = (slot?.callStatus ?? 'pending') as PhoneCallStatus;
   if (phone !== 'phone1' && !num) return <span className="text-slate-300">—</span>;
   return (
-    <select
-      value={value}
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) =>
-        update.mutate(
-          { id: lead._id, phone, callStatus: e.target.value as PhoneCallStatus },
-          { onError: (err) => toast.error(apiError(err)) }
-        )
-      }
-      className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_CALL_STATUS_COLORS[value]}`}
-    >
-      <option value="pending">Not Called</option>
-      <option value="connected">Connected</option>
-      <option value="not_connected">Not Connected</option>
-      <option value="voicemail">Voice Mail</option>
-      <option value="incorrect_no">Incorrect No</option>
-    </select>
+    <div className="space-y-0.5">
+      <select
+        value={value}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) =>
+          update.mutate(
+            { id: lead._id, phone, callStatus: e.target.value as PhoneCallStatus },
+            { onError: (err) => toast.error(apiError(err)) }
+          )
+        }
+        className={`w-full rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_CALL_STATUS_COLORS[value]}`}
+      >
+        <option value="pending">Not Called</option>
+        <option value="connected">Connected</option>
+        <option value="not_connected">Not Connected</option>
+        <option value="voicemail">Voice Mail</option>
+        <option value="incorrect_no">Incorrect No</option>
+      </select>
+      {slot?.lastCalledAt && (
+        <p className="text-[10px] text-slate-400 dark:text-slate-500" title={fmtDateTime(slot.lastCalledAt)}>
+          Called {fmtRelative(slot.lastCalledAt)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -327,7 +339,18 @@ const COLUMNS: ColumnDef[] = [
   },
   { id: 'title', label: 'Title', muted: true, cell: (l) => <span className="block truncate" title={l.title}>{l.title || '—'}</span> },
   { id: 'company', label: 'Company', sortField: 'company', muted: true, cell: (l) => <span className="block truncate" title={l.company}>{l.company || '—'}</span> },
-  { id: 'location', label: 'Location', sortField: 'country', muted: true, cell: (l) => <span className="block truncate" title={location(l)}>{location(l) || '—'}</span> },
+  {
+    id: 'location',
+    label: 'Location',
+    sortField: 'country',
+    muted: true,
+    cell: (l) => (
+      <div className="min-w-0" title={location(l)}>
+        <span className="block truncate">{location(l) || '—'}</span>
+        {l.country && <CountryTime country={l.country} />}
+      </div>
+    ),
+  },
   {
     id: 'email',
     label: 'Email',

@@ -13,6 +13,7 @@ import {
   isEnabled as twilioEnabled,
   resolveCallerId,
   fetchRecordingMedia,
+  getTwilioSettings,
 } from '../services/twilioService.js';
 
 /** Normalizes a phone to a dial-able form, keeping a single leading '+'. */
@@ -22,6 +23,22 @@ function cleanPhone(raw: string): string {
     ? `+${trimmed.slice(1).replace(/\+/g, '')}`
     : trimmed.replace(/\+/g, '');
 }
+
+// Maps a call disposition to the per-phone (CALL STATUS / LEAD STATUS) columns so
+// that calling a number + picking an outcome updates that number's row in the table.
+const DISPOSITION_TO_PHONE_OUTCOME: Record<
+  Disposition,
+  { callStatus: 'connected' | 'not_connected' | 'incorrect_no'; leadOutcome: 'none' | 'interested' | 'not_interested' }
+> = {
+  interested: { callStatus: 'connected', leadOutcome: 'interested' },
+  converted: { callStatus: 'connected', leadOutcome: 'interested' },
+  callback: { callStatus: 'connected', leadOutcome: 'none' },
+  not_interested: { callStatus: 'connected', leadOutcome: 'not_interested' },
+  dnd: { callStatus: 'connected', leadOutcome: 'not_interested' },
+  busy: { callStatus: 'not_connected', leadOutcome: 'none' },
+  switched_off: { callStatus: 'not_connected', leadOutcome: 'none' },
+  wrong_number: { callStatus: 'incorrect_no', leadOutcome: 'not_interested' },
+};
 
 // POST /calls — telecaller records a call update on one of their contacts.
 // callStatus 'done'  → logs a CallLog with an outcome (disposition) and may promote to a Lead.
@@ -70,6 +87,15 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
     // Promote to a Lead when the outcome is a success.
     if (disposition === 'interested' || disposition === 'converted') lead.qualified = true;
 
+    // Reflect the outcome on the dialled number's CALL STATUS / LEAD STATUS columns.
+    const slot =
+      body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
+    const mapped = DISPOSITION_TO_PHONE_OUTCOME[disposition];
+    const s = slot as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
+    s.callStatus = mapped.callStatus;
+    if (mapped.leadOutcome !== 'none') s.leadOutcome = mapped.leadOutcome;
+    s.lastCalledAt = new Date();
+
     // Schedule a follow-up if a date was provided.
     if (body.nextFollowUpAt) {
       followUp = await FollowUp.create({
@@ -81,8 +107,13 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
       });
     }
   } else {
-    // Not done — record the attempt only.
+    // Not done — record the attempt on the dialled number.
     lead.callStatus = 'not_done';
+    const slot =
+      body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
+    const s = slot as { callStatus: string; lastCalledAt?: Date };
+    s.callStatus = 'not_connected';
+    s.lastCalledAt = new Date();
   }
 
   lead.lastContactedAt = new Date();
@@ -153,7 +184,8 @@ export const streamRecording = asyncHandler(async (req: Request, res: Response) 
 // admin; a superadmin falls back to the default caller ID.
 export const getCallConfig = asyncHandler(async (req: Request, res: Response) => {
   const enabled = (await twilioEnabled()) && Boolean(await resolveCallerId(req.user!.id));
-  res.json({ success: true, enabled });
+  const settings = await getTwilioSettings();
+  res.json({ success: true, enabled, defaultCountryCode: settings?.defaultCountryCode ?? '' });
 });
 
 // GET /calls/token — mints a short-lived Twilio Voice access token for the

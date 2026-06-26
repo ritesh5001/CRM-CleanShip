@@ -17,6 +17,8 @@ const integrationSchema = new Schema(
     callerId: { type: String, default: '' },
     // Call behaviour.
     recordCalls: { type: Boolean, default: true },
+    // Prepended to dialled numbers that have no country code (e.g. '+91').
+    defaultCountryCode: { type: String, default: '' },
     // Public base URL Twilio uses to reach our webhooks (overrides env fallback).
     publicServerUrl: { type: String, default: '' },
     updatedBy: { type: Types.ObjectId, ref: 'User' },

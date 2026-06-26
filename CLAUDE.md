@@ -55,8 +55,9 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 - **CallRecording** — `callSid, recordingUrl, durationSec, status`. Staging area for async Twilio
   recording/status webhooks, keyed by CallSid; `logCall` attaches it to the CallLog.
 - **Integration** — singleton settings doc (`key:'twilio'`): `enabled, accountSid, authToken,
-  apiKeySid, apiKeySecret, twimlAppSid, callerId, recordCalls, publicServerUrl`. Managed from the
-  admin Integrations panel (secrets never returned raw).
+  apiKeySid, apiKeySecret, twimlAppSid, callerId, recordCalls, defaultCountryCode, publicServerUrl`.
+  `defaultCountryCode` (e.g. '+91') is prepended to dialled numbers lacking a country code. Managed
+  from the admin Integrations panel (secrets never returned raw).
 - **FollowUp** — `lead, telecaller, scheduledAt, status(pending|done|missed), notes, callLog`.
 - **Notification** — `recipient, type, title, message, link, isRead`.
 - **ImportBatch** — `fileName, uploadedBy, totalRows, successCount, errorCount, errors[]`.
@@ -78,8 +79,10 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   (required when done), optional `remark` + `nextFollowUpAt`, optional `twilioCallSid`, and `phone`
   (phone1|phone2|phone3) + `phoneNumber` recording *which* number was dialed (so the remark/log
   attach to the right number, not always phone1). Done → logs a CallLog, maps lead status, appends
-  remark, and promotes to a Lead (`qualified`) when interested/converted. Not-done → records the
-  attempt only. The **Recents** page (`pages/RecentsPage.tsx`) lists recent calls with playback.
+  remark, maps the disposition onto that number's per-phone CALL STATUS / LEAD STATUS columns +
+  stamps `phoneNOutcome.lastCalledAt` (via `DISPOSITION_TO_PHONE_OUTCOME`), and promotes to a Lead
+  (`qualified`) when interested/converted. Not-done → marks that number `not_connected`. The
+  **Recents** page (`pages/RecentsPage.tsx`) lists recent calls with a scrubbable audio player.
   Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
   `GET /calls/token` (mints a Voice access token), `GET /calls/:id/recording` (auth-proxied
   recording audio stream — telecaller scoped to own calls); public Twilio webhooks
@@ -116,7 +119,11 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 - Role-aware pages (`pages/*`) branch on `useAuthStore().user.role`; the dashboard renders
   `SuperadminDashboard` or `TelecallerDashboard`.
 - Reusable UI in `components/ui/` (Button, Field, Modal, Misc). Feature modals in `features/*`.
-- Formatting/click-to-call helpers in `lib/format.ts`; label/color maps in `lib/constants.ts`.
+- Formatting/click-to-call helpers in `lib/format.ts` (incl. `toE164`); label/color maps in
+  `lib/constants.ts`. Country dialling codes + timezones in `lib/countries.ts`; `<CountryTime>`
+  (`components/CountryTime.tsx`) shows a country's live local time (used in the contacts Location cell).
+  Dialled numbers are normalized to E.164 using the contact's country code, else the integration's
+  `defaultCountryCode`.
 - `@/` is aliased to `client/src/`.
 
 ## Commands

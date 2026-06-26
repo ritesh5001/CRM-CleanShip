@@ -6,7 +6,8 @@ import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
-import { fmtDateTime, isOverdue, telLink, whatsappLink } from '@/lib/format';
+import { fmtDateTime, isOverdue, telLink, toE164, whatsappLink } from '@/lib/format';
+import { countryCallingCode } from '@/lib/countries';
 import { apiError } from '@/api/client';
 import type { Lead } from '@/types';
 
@@ -21,7 +22,8 @@ export function FollowUpsPage() {
   const [scope, setScope] = useState('today');
   const { data, isLoading } = useFollowUps({ scope });
   const markDone = useMarkFollowUpDone();
-  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const callConfig = useCallConfig().data;
+  const callingEnabled = callConfig?.enabled ?? false;
   const startCall = useCallStore((s) => s.startCall);
   const callPhase = useCallStore((s) => s.phase);
   const callBusy = callPhase === 'connecting' || callPhase === 'ringing' || callPhase === 'in_call';
@@ -84,7 +86,13 @@ export function FollowUpsPage() {
                             size="sm"
                             variant="secondary"
                             disabled={callBusy}
-                            onClick={() => startCall({ leadId: lead._id, name: lead.name, phone: lead.phone })}
+                            onClick={() =>
+                              startCall({
+                                leadId: lead._id,
+                                name: lead.name,
+                                phone: toE164(lead.phone, countryCallingCode(lead.country) ?? callConfig?.defaultCountryCode),
+                              })
+                            }
                           >
                             <Phone size={14} /> Call
                           </Button>

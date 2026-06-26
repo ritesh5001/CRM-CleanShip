@@ -13,12 +13,14 @@ export function useCalls(params: { lead?: string; telecaller?: string; page?: nu
   });
 }
 
-/** Whether in-app (Twilio) calling is configured on the server. */
+/** Whether in-app (Twilio) calling is configured on the server (+ default country code). */
 export function useCallConfig() {
   return useQuery({
     queryKey: ['call-config'],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; enabled: boolean }>('/calls/config');
+      const { data } = await api.get<{ success: boolean; enabled: boolean; defaultCountryCode?: string }>(
+        '/calls/config'
+      );
       return data;
     },
     staleTime: 5 * 60 * 1000,

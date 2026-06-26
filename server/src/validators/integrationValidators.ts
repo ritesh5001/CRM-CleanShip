@@ -12,6 +12,11 @@ export const updateTwilioSchema = z.object({
   callerId: z.string().trim().optional(),
   recordCalls: z.boolean().optional(),
   publicServerUrl: z.string().trim().optional(),
+  defaultCountryCode: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\+\d{1,4}$/.test(v), 'Use a country code like +91 or +1')
+    .optional(),
 });
 
 export type UpdateTwilioInput = z.infer<typeof updateTwilioSchema>;

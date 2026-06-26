@@ -48,6 +48,7 @@ const phoneOutcomeSchema = new Schema(
   {
     callStatus: { type: String, enum: PHONE_CALL_STATUSES, default: 'pending' },
     leadOutcome: { type: String, enum: PHONE_LEAD_OUTCOMES, default: 'none' },
+    lastCalledAt: { type: Date },
   },
   { _id: false }
 );

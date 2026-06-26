@@ -20,6 +20,7 @@ interface FormState {
   apiKeySid: string;
   twimlAppSid: string;
   callerId: string;
+  defaultCountryCode: string;
   publicServerUrl: string;
   authToken: string;
   apiKeySecret: string;
@@ -32,6 +33,7 @@ const EMPTY: FormState = {
   apiKeySid: '',
   twimlAppSid: '',
   callerId: '',
+  defaultCountryCode: '',
   publicServerUrl: '',
   authToken: '',
   apiKeySecret: '',
@@ -158,6 +160,7 @@ export function IntegrationsPage() {
         apiKeySid: data.apiKeySid,
         twimlAppSid: data.twimlAppSid,
         callerId: data.callerId,
+        defaultCountryCode: data.defaultCountryCode,
         publicServerUrl: data.publicServerUrl,
         authToken: '',
         apiKeySecret: '',
@@ -177,6 +180,7 @@ export function IntegrationsPage() {
       apiKeySid: form.apiKeySid,
       twimlAppSid: form.twimlAppSid,
       callerId: form.callerId,
+      defaultCountryCode: form.defaultCountryCode.trim(),
       publicServerUrl: form.publicServerUrl,
     };
     if (form.authToken) payload.authToken = form.authToken;
@@ -306,6 +310,17 @@ export function IntegrationsPage() {
               onChange={(e) => set('callerId', e.target.value)}
               placeholder="+14155551234"
             />
+          </div>
+          <div>
+            <Label>Default country code</Label>
+            <Input
+              value={form.defaultCountryCode}
+              onChange={(e) => set('defaultCountryCode', e.target.value)}
+              placeholder="+91"
+            />
+            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              Added to dialled numbers that have no country code (used when a contact's country is unknown).
+            </p>
           </div>
           <div className="sm:col-span-2">
             <Label>Public server URL (for webhooks)</Label>

@@ -23,6 +23,7 @@ function sanitizeTwilio(doc: IntegrationDoc | null) {
     twimlAppSid: doc?.twimlAppSid ?? '',
     callerId: doc?.callerId ?? '',
     recordCalls: doc?.recordCalls ?? true,
+    defaultCountryCode: doc?.defaultCountryCode ?? '',
     publicServerUrl: doc?.publicServerUrl ?? '',
     authTokenSet: Boolean(doc?.authToken),
     apiKeySecretSet: Boolean(doc?.apiKeySecret),
@@ -50,6 +51,7 @@ export const updateTwilioIntegration = asyncHandler(async (req: Request, res: Re
     'twimlAppSid',
     'callerId',
     'recordCalls',
+    'defaultCountryCode',
     'publicServerUrl',
   ] as const;
   for (const field of plainFields) {

@@ -65,6 +65,7 @@ export type PhoneLeadOutcome = 'none' | 'interested' | 'not_interested';
 export interface PhoneOutcome {
   callStatus: PhoneCallStatus;
   leadOutcome: PhoneLeadOutcome;
+  lastCalledAt?: string;
 }
 
 export interface Remark {

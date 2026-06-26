@@ -32,6 +32,19 @@ function publicBase(s: IntegrationDoc | null): string | undefined {
 }
 
 /**
+ * Ensures a number is E.164: if it has no leading '+', prepends the default
+ * country code (stripping any leading zeros from the local part).
+ */
+export function toE164(raw: string, defaultCountryCode?: string): string {
+  const cleaned = raw.trim().replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) return `+${cleaned.slice(1).replace(/\+/g, '')}`;
+  const local = cleaned.replace(/\+/g, '').replace(/^0+/, '');
+  const code = (defaultCountryCode || '').trim();
+  if (!code) return local;
+  return `${code.startsWith('+') ? code : `+${code}`}${local}`;
+}
+
+/**
  * Resolves the caller-ID (Twilio number) a given user dials from:
  *  - a telecaller uses the number the admin assigned them (else none → can't call);
  *  - a superadmin uses their assigned number, else the global default caller ID.
@@ -111,7 +124,8 @@ export async function buildDialTwiml(to: string, callerId: string): Promise<stri
     }
   }
   const dial = response.dial(dialOptions);
-  dial.number(to);
+  // Ensure the dialled number carries a country code (Twilio needs E.164).
+  dial.number(toE164(to, s?.defaultCountryCode));
   return response.toString();
 }
 
