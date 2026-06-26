@@ -67,6 +67,11 @@ const COUNTRIES: Record<string, CountryInfo> = {
   mexico: { code: '+52', tz: 'America/Mexico_City', iso: 'MX' },
   argentina: { code: '+54', tz: 'America/Argentina/Buenos_Aires', iso: 'AR' },
   israel: { code: '+972', tz: 'Asia/Jerusalem', iso: 'IL' },
+  greece: { code: '+30', tz: 'Europe/Athens', iso: 'GR' },
+  cyprus: { code: '+357', tz: 'Asia/Nicosia', iso: 'CY' },
+  gabon: { code: '+241', tz: 'Africa/Libreville', iso: 'GA' },
+  cameroon: { code: '+237', tz: 'Africa/Douala', iso: 'CM' },
+  'papua new guinea': { code: '+675', tz: 'Pacific/Port_Moresby', iso: 'PG' },
 };
 
 export function countryInfo(country?: string | null): CountryInfo | null {
