@@ -162,6 +162,7 @@ lead's number → Twilio fetches Dial TwiML from `POST /calls/voice` → audio i
 auto-measured duration). Recording is a panel toggle; when on, Twilio's `POST /calls/recording`
 webhook stages the recording in the `CallRecording` collection (keyed by CallSid) which `logCall`
 attaches to the CallLog. Playback: recordings are streamed back through `GET /calls/:id/recording`
+
 (server fetches the Twilio media with Basic auth and proxies it — creds never reach the browser);
 the client downloads it as a blob and plays it (`features/calls/CallHistory.tsx`, shown in the
 expanded contact row). Server bits: `services/twilioService.ts` reads settings from the DB per
