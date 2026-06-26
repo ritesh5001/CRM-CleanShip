@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Misc';
 import { DISPOSITION_LABELS } from '@/lib/constants';
 import { fmtDateTime } from '@/lib/format';
+import { formatPhoneDisplay } from '@/lib/phone';
 import type { Disposition } from '@/types';
 
 function fmtDuration(sec?: number) {
@@ -20,7 +21,7 @@ const SLOT_LABEL: Record<string, string> = { phone1: 'Phone 1', phone2: 'Phone 2
 
 /** Which number a call was placed to: the actual number if known, else the slot. */
 function calledNumber(c: { phoneNumber?: string; phone?: string }) {
-  return c.phoneNumber || (c.phone ? SLOT_LABEL[c.phone] : '');
+  return formatPhoneDisplay(c.phoneNumber) || (c.phone ? SLOT_LABEL[c.phone] : '');
 }
 
 function fmtTime(s: number) {

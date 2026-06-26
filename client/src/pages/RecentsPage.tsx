@@ -7,6 +7,7 @@ import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
 import { RecordingPlayer } from '@/features/calls/CallHistory';
 import { DISPOSITION_LABELS } from '@/lib/constants';
 import { fmtRelative, fmtDateTime } from '@/lib/format';
+import { formatPhoneDisplay } from '@/lib/phone';
 import type { CallLog, Disposition, Lead, User } from '@/types';
 
 function fmtDuration(sec?: number) {
@@ -65,7 +66,8 @@ export function RecentsPage() {
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {calls.map((c) => {
               const lead = leadOf(c);
-              const number = c.phoneNumber || lead?.phone || (c.phone ? SLOT_LABEL[c.phone] : '');
+              const number =
+                formatPhoneDisplay(c.phoneNumber || lead?.phone) || (c.phone ? SLOT_LABEL[c.phone] : '');
               return (
                 <div key={c._id} className="flex flex-wrap items-center gap-3 p-4">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">

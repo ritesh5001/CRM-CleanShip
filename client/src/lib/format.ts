@@ -33,20 +33,6 @@ export function cleanPhone(phone: string) {
   return trimmed.startsWith('+') ? `+${trimmed.slice(1).replace(/\+/g, '')}` : trimmed.replace(/\+/g, '');
 }
 
-/**
- * Ensures a number is E.164. If it has no leading '+', prepends `defaultCode`
- * (e.g. '+91'), stripping leading zeros from the local part. Returns the cleaned
- * number unchanged when no country code is available.
- */
-export function toE164(phone: string, defaultCode?: string | null) {
-  const cleaned = cleanPhone(phone);
-  if (cleaned.startsWith('+')) return cleaned;
-  const code = (defaultCode || '').trim();
-  if (!code) return cleaned;
-  const local = cleaned.replace(/^0+/, '');
-  return `${code.startsWith('+') ? code : `+${code}`}${local}`;
-}
-
 /** Builds a click-to-call (tel:) link. */
 export function telLink(phone: string) {
   return `tel:${cleanPhone(phone)}`;

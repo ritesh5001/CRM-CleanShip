@@ -32,8 +32,8 @@ import {
   PHONE_LEAD_OUTCOME_LABELS,
   PRIORITY_COLORS,
 } from '@/lib/constants';
-import { cleanPhone, fmtDate, fmtDateTime, fmtRelative, telLink, toDateInput, toE164, whatsappLink } from '@/lib/format';
-import { countryCallingCode } from '@/lib/countries';
+import { cleanPhone, fmtDate, fmtDateTime, fmtRelative, telLink, toDateInput, whatsappLink } from '@/lib/format';
+import { formatPhoneDisplay, toE164 } from '@/lib/phone';
 import { CountryTime } from '@/components/CountryTime';
 import { useUiStore } from '@/store/ui';
 import type { Density, Lead, PhoneCallStatus, PhoneLeadOutcome, Role, User } from '@/types';
@@ -134,8 +134,8 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
   const phase = useCallStore((s) => s.phase);
   const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
   const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`;
-  // Prefer the contact's country dialling code, else the admin's default code.
-  const dialNumber = toE164(phone, countryCallingCode(lead?.country) ?? callConfig?.defaultCountryCode);
+  // Parse with the contact's country (handles missing '+'), else admin default code.
+  const dialNumber = toE164(phone, lead?.country, callConfig?.defaultCountryCode);
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
@@ -191,11 +191,12 @@ function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
   const num = phoneNumberOf(lead, phone);
   const showNumbers = useUiStore((s) => s.showPhoneNumbers);
   if (!num) return <span className="text-slate-300">—</span>;
+  const pretty = formatPhoneDisplay(num, lead.country);
   return (
     <div className="space-y-0.5">
       {showNumbers && (
-        <span className="block truncate text-xs font-medium text-slate-700 dark:text-slate-200" title={num}>
-          {num}
+        <span className="block truncate text-xs font-medium text-slate-700 dark:text-slate-200" title={pretty}>
+          {pretty}
         </span>
       )}
       <PhoneActions phone={num} lead={lead} slot={phone} />
@@ -826,7 +827,14 @@ function PhoneOutcomePanel({
   if (isAdmin) {
     return (
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {label}
+          {phoneNumber && (
+            <span className="ml-1.5 normal-case text-slate-500 dark:text-slate-400">
+              {formatPhoneDisplay(phoneNumber, lead.country)}
+            </span>
+          )}
+        </p>
         <div className="flex items-center gap-2 flex-wrap">
           <PhoneActions phone={phoneNumber} lead={lead} slot={phone} />
           <Badge className={PHONE_CALL_STATUS_COLORS[slot.callStatus]}>
@@ -1124,7 +1132,7 @@ function MobileCard({
             {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
           </div>
           <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {lead.phone}
+            {formatPhoneDisplay(lead.phone, lead.country)}
             {lead.company ? ` · ${lead.company}` : ''}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -6,8 +6,8 @@ import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
-import { fmtDateTime, isOverdue, telLink, toE164, whatsappLink } from '@/lib/format';
-import { countryCallingCode } from '@/lib/countries';
+import { fmtDateTime, isOverdue, telLink, whatsappLink } from '@/lib/format';
+import { formatPhoneDisplay, toE164 } from '@/lib/phone';
 import { apiError } from '@/api/client';
 import type { Lead } from '@/types';
 
@@ -74,7 +74,9 @@ export function FollowUpsPage() {
                       <p className="font-medium text-slate-800 dark:text-slate-100">{lead?.name}</p>
                       {overdue && <Badge className="bg-rose-100 text-rose-700">Overdue</Badge>}
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{lead?.phone}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {formatPhoneDisplay(lead?.phone, lead?.country)}
+                    </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">Scheduled {fmtDateTime(f.scheduledAt)}</p>
                     {f.notes && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">“{f.notes}”</p>}
                   </div>
@@ -90,7 +92,7 @@ export function FollowUpsPage() {
                               startCall({
                                 leadId: lead._id,
                                 name: lead.name,
-                                phone: toE164(lead.phone, countryCallingCode(lead.country) ?? callConfig?.defaultCountryCode),
+                                phone: toE164(lead.phone, lead.country, callConfig?.defaultCountryCode),
                               })
                             }
                           >

@@ -119,11 +119,13 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 - Role-aware pages (`pages/*`) branch on `useAuthStore().user.role`; the dashboard renders
   `SuperadminDashboard` or `TelecallerDashboard`.
 - Reusable UI in `components/ui/` (Button, Field, Modal, Misc). Feature modals in `features/*`.
-- Formatting/click-to-call helpers in `lib/format.ts` (incl. `toE164`); label/color maps in
-  `lib/constants.ts`. Country dialling codes + timezones in `lib/countries.ts`; `<CountryTime>`
-  (`components/CountryTime.tsx`) shows a country's live local time (used in the contacts Location cell).
-  Dialled numbers are normalized to E.164 using the contact's country code, else the integration's
-  `defaultCountryCode`.
+- Formatting/click-to-call helpers in `lib/format.ts`; label/color maps in `lib/constants.ts`.
+  Country dialling codes/timezones/ISO in `lib/countries.ts`; `<CountryTime>`
+  (`components/CountryTime.tsx`) shows a country's live local time (contacts Location cell).
+  Phone parsing/formatting in `lib/phone.ts` via **libphonenumber-js**: `formatPhoneDisplay(raw,
+  country)` for pretty display (strips junk like leading quotes, formats international), and
+  `toE164(raw, country, defaultCode)` for dialling — parses with the contact's country so a number
+  that already includes the country code without '+' (e.g. `14102927721`) isn't double-prefixed.
 - `@/` is aliased to `client/src/`.
 
 ## Commands

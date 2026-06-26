@@ -6,10 +6,13 @@ interface RawRow {
   [key: string]: unknown;
 }
 
-/** Cleans a cell: strips Excel's leading text-prefix apostrophe and trims. */
+/** Cleans a cell: strips Excel's text-prefix apostrophes/quotes (e.g. `"+971…`) and trims. */
 function clean(v: unknown): string {
   if (v == null) return '';
-  return String(v).trim().replace(/^'+/, '').trim();
+  return String(v)
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .trim();
 }
 
 /** Returns the first non-empty cell whose normalized header matches one of `keys`. */
