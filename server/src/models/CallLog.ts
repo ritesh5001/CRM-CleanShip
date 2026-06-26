@@ -41,6 +41,9 @@ const callLogSchema = new Schema(
     notes: { type: String, default: '' },
     durationSec: { type: Number, default: 0, min: 0 },
     nextFollowUpAt: { type: Date },
+    // Which of the contact's numbers was dialled, and the actual number string.
+    phone: { type: String, enum: ['phone1', 'phone2', 'phone3'], default: 'phone1' },
+    phoneNumber: { type: String, default: '' },
     // Twilio call correlation (set when the call was placed via the browser softphone).
     twilioCallSid: { type: String, index: true },
     recordingUrl: { type: String },

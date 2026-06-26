@@ -4,12 +4,14 @@ import { fetchVoiceToken } from '@/api/calls';
 import { cleanPhone } from '@/lib/format';
 
 export type CallPhase = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended';
+export type PhoneSlot = 'phone1' | 'phone2' | 'phone3';
 
 /** Summary of a just-ended call, used to seed the disposition modal. */
 export interface PendingDisposition {
   leadId: string;
   leadName: string;
-  phone: string;
+  phone: string; // the actual number that was dialled
+  phoneSlot: PhoneSlot; // which of the contact's numbers (phone1/2/3)
   durationSec: number;
   twilioCallSid?: string;
 }
@@ -23,6 +25,7 @@ interface CallState {
   leadId: string | null;
   leadName: string;
   phone: string;
+  phoneSlot: PhoneSlot;
   startedAt: number | null; // epoch ms when the call was accepted
   muted: boolean;
   error: string | null;
@@ -30,7 +33,7 @@ interface CallState {
 
   /** Lazily create the Twilio Device (idempotent). Safe to call repeatedly. */
   initDevice: () => Promise<void>;
-  startCall: (lead: { leadId: string; name: string; phone: string }) => Promise<void>;
+  startCall: (lead: { leadId: string; name: string; phone: string; phoneSlot?: PhoneSlot }) => Promise<void>;
   toggleMute: () => void;
   hangup: () => void;
   clearPending: () => void;
@@ -46,6 +49,7 @@ export const useCallStore = create<CallState>((set, get) => ({
   leadId: null,
   leadName: '',
   phone: '',
+  phoneSlot: 'phone1',
   startedAt: null,
   muted: false,
   error: null,
@@ -80,7 +84,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
 
-  startCall: async ({ leadId, name, phone }) => {
+  startCall: async ({ leadId, name, phone, phoneSlot = 'phone1' }) => {
     const { phase } = get();
     if (phase !== 'idle' && phase !== 'ended') return; // a call is already in progress
     await get().initDevice();
@@ -96,6 +100,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       leadId,
       leadName: name,
       phone: to,
+      phoneSlot,
       muted: false,
       startedAt: null,
       error: null,
@@ -112,14 +117,16 @@ export const useCallStore = create<CallState>((set, get) => ({
         set({ phase: 'in_call', startedAt: Date.now() });
       });
       const finish = () => {
-        const { startedAt, leadId: lid, leadName: lname, phone: ph } = get();
+        const { startedAt, leadId: lid, leadName: lname, phone: ph, phoneSlot: slot } = get();
         const durationSec = startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : 0;
         set({
           phase: 'ended',
           call: null,
           startedAt: null,
           muted: false,
-          pending: lid ? { leadId: lid, leadName: lname, phone: ph, durationSec, twilioCallSid: callSid } : null,
+          pending: lid
+            ? { leadId: lid, leadName: lname, phone: ph, phoneSlot: slot, durationSec, twilioCallSid: callSid }
+            : null,
         });
       };
       call.on('disconnect', finish);

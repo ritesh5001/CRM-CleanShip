@@ -50,6 +50,8 @@ export function CallDispositionModal() {
         durationSec: pending.durationSec,
         nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt).toISOString() : undefined,
         twilioCallSid: pending.twilioCallSid,
+        phone: pending.phoneSlot,
+        phoneNumber: pending.phone,
       },
       {
         onSuccess: () => {
@@ -82,7 +84,7 @@ export function CallDispositionModal() {
         <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
           <p className="font-medium text-slate-800 dark:text-slate-100">{pending.leadName || pending.phone}</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Duration: {fmtDuration(pending.durationSec)}
+            {pending.phone} · Duration: {fmtDuration(pending.durationSec)}
           </p>
         </div>
 

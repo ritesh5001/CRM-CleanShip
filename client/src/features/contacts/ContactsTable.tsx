@@ -123,7 +123,7 @@ function FollowUpCell({ lead }: { lead: Lead }) {
 /** Copy (left) · Call · WhatsApp actions for a phone number.
  *  When Twilio calling is enabled and a `lead` is provided, Call dials in-app
  *  (browser softphone); otherwise it falls back to a `tel:` link. */
-function PhoneActions({ phone, lead, big }: { phone: string; lead?: Lead; big?: boolean }) {
+function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; lead?: Lead; slot?: PhoneSlot; big?: boolean }) {
   const size = big ? 16 : 15;
   const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
   const callingEnabled = useCallConfig().data?.enabled ?? false;
@@ -142,7 +142,7 @@ function PhoneActions({ phone, lead, big }: { phone: string; lead?: Lead; big?: 
       </button>
       {callingEnabled && lead ? (
         <button
-          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone })}
+          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone, phoneSlot: slot })}
           disabled={busy}
           title={busy ? 'A call is in progress' : `Call ${phone}`}
           className={`${callCls} disabled:opacity-40`}
@@ -193,7 +193,7 @@ function PhoneNumberCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
           {num}
         </span>
       )}
-      <PhoneActions phone={num} lead={lead} />
+      <PhoneActions phone={num} lead={lead} slot={phone} />
     </div>
   );
 }
@@ -805,7 +805,7 @@ function PhoneOutcomePanel({
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
         <div className="flex items-center gap-2 flex-wrap">
-          <PhoneActions phone={phoneNumber} lead={lead} />
+          <PhoneActions phone={phoneNumber} lead={lead} slot={phone} />
           <Badge className={PHONE_CALL_STATUS_COLORS[slot.callStatus]}>
             {PHONE_CALL_STATUS_LABELS[slot.callStatus]}
           </Badge>
@@ -828,7 +828,7 @@ function PhoneOutcomePanel({
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-      <PhoneActions phone={phoneNumber} lead={lead} />
+      <PhoneActions phone={phoneNumber} lead={lead} slot={phone} />
       <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
         {PHONE_CALL_OPTIONS.map((cs) => (
           <button
@@ -1105,7 +1105,7 @@ function MobileCard({
             {lead.company ? ` · ${lead.company}` : ''}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <PhoneActions phone={lead.phone} lead={lead} big />
+            <PhoneActions phone={lead.phone} lead={lead} slot="phone1" big />
             {isAdmin && onAssign && <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />}
             <PhoneSummaryBadges lead={lead} />
             <button onClick={() => setOpen((o) => !o)} className="ml-auto text-slate-400">

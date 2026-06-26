@@ -5,6 +5,7 @@ import {
   Star,
   ListChecks,
   CalendarClock,
+  PhoneCall,
   Plug,
   type LucideIcon,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
+    { to: '/recents', label: 'Recents', icon: PhoneCall },
     { to: '/integrations', label: 'Integrations', icon: Plug },
   ],
   telecaller: [
@@ -30,6 +32,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
+    { to: '/recents', label: 'Recents', icon: PhoneCall },
     { to: '/followups', label: 'Follow-ups', icon: CalendarClock },
   ],
 };

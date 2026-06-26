@@ -49,7 +49,8 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
-- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt, twilioCallSid,
+- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt, phone (which of
+  the contact's numbers: phone1|phone2|phone3), phoneNumber (the dialed number), twilioCallSid,
   recordingUrl`. `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
 - **CallRecording** — `callSid, recordingUrl, durationSec, status`. Staging area for async Twilio
   recording/status webhooks, keyed by CallSid; `logCall` attaches it to the CallLog.
@@ -72,10 +73,13 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   telecallers get a scoped `GET`/`PUT`.
 - **Tasks:** `GET /tasks`, `POST /tasks` (admin), `GET /tasks/:id`, `PUT /tasks/:id` (admin),
   `PATCH /tasks/:id/status`, `DELETE /tasks/:id` (admin).
-- **Calls:** `GET /calls`, `POST /calls` — telecaller call update: `callStatus: done|not_done`,
-  optional `disposition` (required when done), optional `remark` + `nextFollowUpAt`, optional
-  `twilioCallSid`. Done → logs a CallLog, maps lead status, appends remark, and promotes to a Lead
-  (`qualified`) when interested/converted. Not-done → records the attempt only.
+- **Calls:** `GET /calls` (call history; `?lead=` for one contact; telecaller scoped to own),
+  `POST /calls` — telecaller call update: `callStatus: done|not_done`, optional `disposition`
+  (required when done), optional `remark` + `nextFollowUpAt`, optional `twilioCallSid`, and `phone`
+  (phone1|phone2|phone3) + `phoneNumber` recording *which* number was dialed (so the remark/log
+  attach to the right number, not always phone1). Done → logs a CallLog, maps lead status, appends
+  remark, and promotes to a Lead (`qualified`) when interested/converted. Not-done → records the
+  attempt only. The **Recents** page (`pages/RecentsPage.tsx`) lists recent calls with playback.
   Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
   `GET /calls/token` (mints a Voice access token), `GET /calls/:id/recording` (auth-proxied
   recording audio stream — telecaller scoped to own calls); public Twilio webhooks

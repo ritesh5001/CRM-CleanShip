@@ -50,6 +50,8 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
       durationSec: body.durationSec,
       nextFollowUpAt: body.nextFollowUpAt,
       twilioCallSid: body.twilioCallSid,
+      phone: body.phone,
+      phoneNumber: body.phoneNumber,
     });
 
     // Attach a Twilio recording if its webhook already landed (see CallRecording).
@@ -86,13 +88,14 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
   lead.lastContactedAt = new Date();
   lead.nextFollowUpAt = body.nextFollowUpAt ?? lead.nextFollowUpAt;
 
-  // Append the remark to the shared timeline.
+  // Append the remark to the shared timeline, tagged with the number that was dialled.
   if (body.remark) {
     lead.remarks.push({
       text: body.remark,
       by: req.user!.id,
       byName: req.user!.name,
       byRole: req.user!.role,
+      phone: body.phone,
       createdAt: new Date(),
     });
   }

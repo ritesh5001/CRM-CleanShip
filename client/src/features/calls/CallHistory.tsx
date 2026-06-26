@@ -16,8 +16,15 @@ function fmtDuration(sec?: number) {
   return m ? `${m}m ${s}s` : `${s}s`;
 }
 
+const SLOT_LABEL: Record<string, string> = { phone1: 'Phone 1', phone2: 'Phone 2', phone3: 'Phone 3' };
+
+/** Which number a call was placed to: the actual number if known, else the slot. */
+function calledNumber(c: { phoneNumber?: string; phone?: string }) {
+  return c.phoneNumber || (c.phone ? SLOT_LABEL[c.phone] : '');
+}
+
 /** Lazily downloads (auth-proxied) and plays a single call recording. */
-function RecordingPlayer({ callId }: { callId: string }) {
+export function RecordingPlayer({ callId }: { callId: string }) {
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +78,10 @@ export function CallHistory({ leadId }: { leadId: string }) {
                     · {fmtDuration(c.durationSec)}
                   </span>
                 </p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500">{fmtDateTime(c.createdAt)}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                  {calledNumber(c) && <span>{calledNumber(c)} · </span>}
+                  {fmtDateTime(c.createdAt)}
+                </p>
               </div>
               {c.recordingUrl ? (
                 <RecordingPlayer callId={c._id} />

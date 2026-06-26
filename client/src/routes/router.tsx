@@ -9,6 +9,7 @@ import { LeadsPage } from '@/pages/LeadsPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { FollowUpsPage } from '@/pages/FollowUpsPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
+import { RecentsPage } from '@/pages/RecentsPage';
 
 export function AppRoutes() {
   return (
@@ -34,6 +35,7 @@ export function AppRoutes() {
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/followups" element={<FollowUpsPage />} />
+        <Route path="/recents" element={<RecentsPage />} />
         <Route
           path="/integrations"
           element={

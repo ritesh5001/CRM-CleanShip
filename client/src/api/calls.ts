@@ -58,6 +58,8 @@ interface LogCallVars {
   durationSec?: number;
   nextFollowUpAt?: string;
   twilioCallSid?: string;
+  phone?: 'phone1' | 'phone2' | 'phone3';
+  phoneNumber?: string;
 }
 
 /** Optimistically patch a single lead across every cached `['leads', …]` list. */
@@ -100,6 +102,7 @@ export function useLogCall() {
               text: vars.remark,
               byName: user?.name,
               byRole: user?.role,
+              phone: vars.phone,
               createdAt: new Date().toISOString(),
             },
           ];
@@ -116,6 +119,7 @@ export function useLogCall() {
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
       qc.invalidateQueries({ queryKey: ['followups'] });
       qc.invalidateQueries({ queryKey: ['my-stats'] });
+      qc.invalidateQueries({ queryKey: ['calls'] });
     },
   });
 }

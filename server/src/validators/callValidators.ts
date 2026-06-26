@@ -11,6 +11,8 @@ export const logCallSchema = z
     durationSec: z.number().int().min(0).optional().default(0),
     nextFollowUpAt: z.coerce.date().optional(),
     twilioCallSid: z.string().optional(),
+    phone: z.enum(['phone1', 'phone2', 'phone3']).optional().default('phone1'),
+    phoneNumber: z.string().optional().default(''),
   })
   .refine((d) => d.callStatus !== 'done' || !!d.disposition, {
     message: 'An outcome (disposition) is required when the call is marked done',

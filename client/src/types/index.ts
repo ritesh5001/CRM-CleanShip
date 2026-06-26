@@ -114,6 +114,8 @@ export interface CallLog {
   nextFollowUpAt?: string;
   twilioCallSid?: string;
   recordingUrl?: string;
+  phone?: 'phone1' | 'phone2' | 'phone3';
+  phoneNumber?: string;
   createdAt: string;
 }
 
