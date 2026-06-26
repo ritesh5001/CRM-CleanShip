@@ -49,9 +49,12 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
-- **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt, phone (which of
-  the contact's numbers: phone1|phone2|phone3), phoneNumber (the dialed number), twilioCallSid,
-  recordingUrl`. `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
+- **CallLog** — one row per call activity (so Recents/history is complete): `lead, telecaller,
+  disposition? (set when connected), callStatus (connected|not_connected|voicemail|incorrect_no),
+  notes, durationSec, nextFollowUpAt, phone (phone1|phone2|phone3), phoneNumber, twilioCallSid,
+  recordingUrl`. Created by `logCall` (softphone — both done AND not-connected) and by
+  `updatePhoneOutcome` (a manual call-status dropdown change also logs a call).
+  `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
 - **CallRecording** — `callSid, recordingUrl, durationSec, status, dialStatus`. Staging area for
   async Twilio recording/status/dial-result webhooks, keyed by CallSid; `logCall` attaches the
   recording to the CallLog, and the client polls `dialStatus` to show why a call failed.

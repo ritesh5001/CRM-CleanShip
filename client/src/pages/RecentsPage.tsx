@@ -5,10 +5,10 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
 import { RecordingPlayer } from '@/features/calls/CallHistory';
-import { DISPOSITION_LABELS } from '@/lib/constants';
+import { callLogOutcomeLabel } from '@/lib/constants';
 import { fmtRelative, fmtDateTime } from '@/lib/format';
 import { formatPhoneDisplay } from '@/lib/phone';
-import type { CallLog, Disposition, Lead, User } from '@/types';
+import type { CallLog, Lead, User } from '@/types';
 
 function fmtDuration(sec?: number) {
   if (!sec) return '0s';
@@ -84,7 +84,7 @@ export function RecentsPage() {
                   </div>
                   <div className="text-right">
                     <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {DISPOSITION_LABELS[c.disposition as Disposition] ?? c.disposition}
+                      {callLogOutcomeLabel(c.disposition, c.callStatus)}
                     </Badge>
                     <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500" title={fmtDateTime(c.createdAt)}>
                       {fmtDuration(c.durationSec)} · {fmtRelative(c.createdAt)}

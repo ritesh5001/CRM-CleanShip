@@ -5,10 +5,9 @@ import { useCalls, fetchRecordingObjectUrl } from '@/api/calls';
 import { apiError } from '@/api/client';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Misc';
-import { DISPOSITION_LABELS } from '@/lib/constants';
+import { callLogOutcomeLabel } from '@/lib/constants';
 import { fmtDateTime } from '@/lib/format';
 import { formatPhoneDisplay } from '@/lib/phone';
-import type { Disposition } from '@/types';
 
 function fmtDuration(sec?: number) {
   if (!sec) return '0s';
@@ -153,7 +152,7 @@ export function CallHistory({ leadId }: { leadId: string }) {
             >
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                  {DISPOSITION_LABELS[c.disposition as Disposition] ?? c.disposition}
+                  {callLogOutcomeLabel(c.disposition, c.callStatus)}
                   <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">
                     · {fmtDuration(c.durationSec)}
                   </span>

@@ -109,7 +109,8 @@ export interface CallLog {
   _id: string;
   lead: Lead | string;
   telecaller: User | string;
-  disposition: Disposition;
+  disposition?: Disposition;
+  callStatus?: PhoneCallStatus;
   notes?: string;
   durationSec?: number;
   nextFollowUpAt?: string;

@@ -37,7 +37,10 @@ const callLogSchema = new Schema(
   {
     lead: { type: Types.ObjectId, ref: 'Lead', required: true, index: true },
     telecaller: { type: Types.ObjectId, ref: 'User', required: true, index: true },
-    disposition: { type: String, enum: DISPOSITIONS, required: true },
+    // Optional: a "not connected" attempt or a plain call-status mark has no disposition.
+    disposition: { type: String, enum: DISPOSITIONS },
+    // The per-phone call status this log represents (connected/not_connected/voicemail/incorrect_no).
+    callStatus: { type: String, enum: ['connected', 'not_connected', 'voicemail', 'incorrect_no'] },
     notes: { type: String, default: '' },
     durationSec: { type: Number, default: 0, min: 0 },
     nextFollowUpAt: { type: Date },

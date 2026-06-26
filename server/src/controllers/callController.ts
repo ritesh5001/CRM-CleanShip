@@ -53,48 +53,51 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.forbidden('This contact is not assigned to you');
   }
 
-  let callLog = null;
   let followUp = null;
+  const isDone = body.callStatus === 'done';
+  const disposition = isDone ? (body.disposition as Disposition) : undefined;
+  const slot =
+    body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
+  const s = slot as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
 
-  if (body.callStatus === 'done') {
-    const disposition = body.disposition as Disposition;
+  // Always log the call — connected (with a disposition) OR a not-connected attempt —
+  // so every call shows up in Recents / call history.
+  const callLog = await CallLog.create({
+    lead: lead._id,
+    telecaller: req.user!.id,
+    disposition,
+    callStatus: isDone ? DISPOSITION_TO_PHONE_OUTCOME[disposition!].callStatus : 'not_connected',
+    notes: body.notes || body.remark,
+    durationSec: body.durationSec,
+    nextFollowUpAt: body.nextFollowUpAt,
+    twilioCallSid: body.twilioCallSid,
+    phone: body.phone,
+    phoneNumber: body.phoneNumber,
+  });
 
-    callLog = await CallLog.create({
-      lead: lead._id,
-      telecaller: req.user!.id,
-      disposition,
-      notes: body.notes || body.remark,
-      durationSec: body.durationSec,
-      nextFollowUpAt: body.nextFollowUpAt,
-      twilioCallSid: body.twilioCallSid,
-      phone: body.phone,
-      phoneNumber: body.phoneNumber,
-    });
-
-    // Attach a Twilio recording if its webhook already landed (see CallRecording).
-    if (body.twilioCallSid) {
-      const rec = await CallRecording.findOne({ callSid: body.twilioCallSid });
-      if (rec) {
-        if (rec.recordingUrl) callLog.recordingUrl = rec.recordingUrl;
-        if (!body.durationSec && rec.durationSec) callLog.durationSec = rec.durationSec;
-        await callLog.save();
-      }
+  // Attach a Twilio recording if its webhook already landed (see CallRecording).
+  if (body.twilioCallSid) {
+    const rec = await CallRecording.findOne({ callSid: body.twilioCallSid });
+    if (rec) {
+      if (rec.recordingUrl) callLog.recordingUrl = rec.recordingUrl;
+      if (!body.durationSec && rec.durationSec) callLog.durationSec = rec.durationSec;
+      await callLog.save();
     }
+  }
 
-    lead.status = DISPOSITION_TO_LEAD_STATUS[disposition] as typeof lead.status;
+  s.lastCalledAt = new Date();
+
+  if (isDone) {
+    lead.status = DISPOSITION_TO_LEAD_STATUS[disposition!] as typeof lead.status;
     lead.callStatus = 'done';
-    lead.lastOutcome = disposition;
+    lead.lastOutcome = disposition!;
     // Promote to a Lead when the outcome is a success.
     if (disposition === 'interested' || disposition === 'converted') lead.qualified = true;
 
     // Reflect the outcome on the dialled number's CALL STATUS / LEAD STATUS columns.
-    const slot =
-      body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
-    const mapped = DISPOSITION_TO_PHONE_OUTCOME[disposition];
-    const s = slot as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
+    const mapped = DISPOSITION_TO_PHONE_OUTCOME[disposition!];
     s.callStatus = mapped.callStatus;
     if (mapped.leadOutcome !== 'none') s.leadOutcome = mapped.leadOutcome;
-    s.lastCalledAt = new Date();
 
     // Schedule a follow-up if a date was provided.
     if (body.nextFollowUpAt) {
@@ -109,11 +112,7 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
   } else {
     // Not done — record the attempt on the dialled number.
     lead.callStatus = 'not_done';
-    const slot =
-      body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
-    const s = slot as { callStatus: string; lastCalledAt?: Date };
     s.callStatus = 'not_connected';
-    s.lastCalledAt = new Date();
   }
 
   lead.lastContactedAt = new Date();

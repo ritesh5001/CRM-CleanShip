@@ -295,6 +295,7 @@ export function useUpdatePhoneOutcome() {
       qc.invalidateQueries({ queryKey: ['lead', v.id] });
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
       qc.invalidateQueries({ queryKey: ['followups'] });
+      qc.invalidateQueries({ queryKey: ['calls'] }); // a call-status change logs a call → refresh Recents
     },
   });
 }

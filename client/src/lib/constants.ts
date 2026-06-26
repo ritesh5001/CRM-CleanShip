@@ -75,6 +75,13 @@ export const PHONE_CALL_STATUS_LABELS: Record<PhoneCallStatus, string> = {
   incorrect_no: 'Incorrect No',
 };
 
+/** Label for a call log: its disposition if any, else the call status (for attempts/dropdown marks). */
+export function callLogOutcomeLabel(disposition?: Disposition | null, callStatus?: PhoneCallStatus | null): string {
+  if (disposition) return DISPOSITION_LABELS[disposition];
+  if (callStatus && callStatus !== 'pending') return PHONE_CALL_STATUS_LABELS[callStatus];
+  return 'Logged';
+}
+
 export const PHONE_CALL_STATUS_COLORS: Record<PhoneCallStatus, string> = {
   pending: 'bg-slate-100 text-slate-500',
   connected: 'bg-emerald-100 text-emerald-700',

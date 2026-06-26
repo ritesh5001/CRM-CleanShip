@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { Lead, deriveCallStatus, deriveLeadStatus } from '../models/Lead.js';
 import type { PhoneCallStatus, PhoneLeadOutcome } from '../models/Lead.js';
 import { User } from '../models/User.js';
+import { CallLog } from '../models/CallLog.js';
 import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
 import { importLeads, previewImport } from '../services/importService.js';
@@ -380,6 +381,23 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
   if (derived !== null) {
     lead.status = derived.status;
     lead.qualified = derived.qualified;
+  }
+
+  // A call-status change (via the dropdown) is a call activity — log it so it shows
+  // in Recents / call history, mirroring how the softphone disposition is logged.
+  if (callStatus && callStatus !== 'pending') {
+    (slot as { lastCalledAt?: Date }).lastCalledAt = new Date();
+    const lo = (slot as { leadOutcome: PhoneLeadOutcome }).leadOutcome;
+    const number = phone === 'phone1' ? lead.phone : phone === 'phone2' ? lead.altPhone : lead.altPhone2;
+    await CallLog.create({
+      lead: lead._id,
+      telecaller: idOf(lead.assignedTo) || req.user!.id,
+      disposition: lo === 'interested' ? 'interested' : lo === 'not_interested' ? 'not_interested' : undefined,
+      callStatus,
+      phone,
+      phoneNumber: number || '',
+      notes: remark?.trim() || '',
+    });
   }
 
   if (remark?.trim()) {
