@@ -110,12 +110,12 @@ export async function generateVoiceToken(identity: string): Promise<{ token: str
 export async function buildDialTwiml(to: string, callerId: string): Promise<string> {
   const s = await getTwilioSettings();
   const response = new VoiceResponse();
-  const recordingCallback = (() => {
-    const base = publicBase(s);
-    return base ? `${base}/api/v1/calls/recording` : undefined;
-  })();
+  const base = publicBase(s);
+  const recordingCallback = base ? `${base}/api/v1/calls/recording` : undefined;
 
   const dialOptions: Record<string, unknown> = { callerId };
+  // `action` makes Twilio POST the dial result (completed/busy/no-answer/failed) back to us.
+  if (base) dialOptions.action = `${base}/api/v1/calls/dial-status`;
   if (s?.recordCalls) {
     dialOptions.record = 'record-from-answer-dual';
     if (recordingCallback) {

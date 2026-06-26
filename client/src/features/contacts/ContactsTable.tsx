@@ -14,7 +14,11 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import toast from 'react-hot-toast';
 import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
 import { Button } from '@/components/ui/Button';
@@ -136,6 +140,60 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
   const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`;
   // Parse with the contact's country (handles missing '+'), else admin default code.
   const dialNumber = toE164(phone, lead?.country, callConfig?.defaultCountryCode);
+
+  // Inline number editing (both roles; telecaller scoped to assigned server-side).
+  const updateLead = useUpdateLead();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(phone);
+
+  function saveNumber() {
+    if (!lead) return;
+    const next = val.trim();
+    const payload: { id: string } & Partial<Lead> = { id: lead._id };
+    if (slot === 'phone1') payload.phone = next;
+    else if (slot === 'phone2') payload.altPhone = next;
+    else payload.altPhone2 = next;
+    updateLead.mutate(payload, {
+      onSuccess: () => {
+        setEditing(false);
+        toast.success('Number updated');
+      },
+      onError: (e) => toast.error(apiError(e)),
+    });
+  }
+
+  function handleCall() {
+    if (!lead) return;
+    if (dialNumber.startsWith('+') && !isValidPhoneNumber(dialNumber)) {
+      toast.error('This number looks invalid. Update it and try again.');
+      setVal(phone);
+      setEditing(true);
+      return;
+    }
+    startCall({ leadId: lead._id, name: lead.name, phone: dialNumber, phoneSlot: slot });
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && saveNumber()}
+          placeholder="+countrycode number"
+          className="w-36 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+        />
+        <button onClick={saveNumber} disabled={updateLead.isPending} title="Save" className={`${cls} text-emerald-600 hover:bg-emerald-50`}>
+          <Check size={size} />
+        </button>
+        <button onClick={() => { setEditing(false); setVal(phone); }} title="Cancel" className={`${cls} text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700`}>
+          <X size={size} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
@@ -147,7 +205,7 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
       </button>
       {callingEnabled && lead ? (
         <button
-          onClick={() => startCall({ leadId: lead._id, name: lead.name, phone: dialNumber, phoneSlot: slot })}
+          onClick={handleCall}
           disabled={busy}
           title={busy ? 'A call is in progress' : `Call ${phone}`}
           className={`${callCls} disabled:opacity-40`}
@@ -167,6 +225,15 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
       >
         <MessageCircle size={size} />
       </a>
+      {lead && (
+        <button
+          onClick={() => { setVal(phone); setEditing(true); }}
+          title="Edit number"
+          className={`${cls} text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700`}
+        >
+          <Pencil size={size} />
+        </button>
+      )}
     </div>
   );
 }

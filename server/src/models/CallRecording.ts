@@ -10,6 +10,8 @@ const callRecordingSchema = new Schema(
     recordingUrl: { type: String },
     durationSec: { type: Number, min: 0 },
     status: { type: String },
+    // Result of dialing the lead: completed | busy | no-answer | failed | canceled.
+    dialStatus: { type: String },
   },
   { timestamps: true }
 );

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Call, Device } from '@twilio/voice-sdk';
-import { fetchVoiceToken } from '@/api/calls';
+import { isValidPhoneNumber } from 'libphonenumber-js';
+import { fetchVoiceToken, fetchDialStatus } from '@/api/calls';
 import { cleanPhone } from '@/lib/format';
 
 export type CallPhase = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended';
@@ -14,6 +15,53 @@ export interface PendingDisposition {
   phoneSlot: PhoneSlot; // which of the contact's numbers (phone1/2/3)
   durationSec: number;
   twilioCallSid?: string;
+  dialStatus?: string; // completed | busy | no-answer | failed | canceled
+  resultReason?: string; // human-readable reason shown to the user
+}
+
+/** Turns a Twilio dial result into a clear, human reason. */
+export function dialStatusReason(status?: string | null): string | null {
+  switch (status) {
+    case 'busy':
+      return 'The number was busy.';
+    case 'no-answer':
+      return 'No answer.';
+    case 'failed':
+      return 'Call failed — the number may be wrong or unreachable. Try updating it.';
+    case 'canceled':
+      return 'Call was canceled.';
+    case 'completed':
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** Maps Twilio Voice SDK error codes to a clear message for the telecaller. */
+function friendlyDeviceError(e: { code?: number; message?: string }): string {
+  switch (e.code) {
+    case 31401:
+      return 'Microphone permission denied. Allow mic access and try again.';
+    case 31208:
+      return 'Microphone permission denied. Allow mic access in your browser.';
+    case 31003:
+    case 31005:
+      return 'Connection problem. Check your internet and try again.';
+    case 20101:
+    case 20104:
+    case 31204:
+      return 'Calling session expired. Refresh the page and try again.';
+    case 31002:
+      return 'Could not connect the call. The number may be invalid or not allowed.';
+    case 13224:
+    case 13223:
+    case 21211:
+      return 'Invalid phone number. Please update the number.';
+    case 13227:
+      return 'Calls to this country are not enabled on the Twilio account.';
+    default:
+      return e.message || 'Call error. Please try again.';
+  }
 }
 
 interface CallState {
@@ -37,6 +85,7 @@ interface CallState {
   toggleMute: () => void;
   hangup: () => void;
   clearPending: () => void;
+  pollDialStatus: (callSid: string) => Promise<void>;
   destroy: () => void;
 }
 
@@ -65,7 +114,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         logLevel: 'error',
       });
-      dev.on('error', (e: { message?: string }) => set({ error: e?.message ?? 'Device error' }));
+      dev.on('error', (e: { code?: number; message?: string }) => set({ error: friendlyDeviceError(e) }));
       // Refresh the token shortly before it expires so the softphone stays live.
       dev.on('tokenWillExpire', async () => {
         try {
@@ -87,14 +136,20 @@ export const useCallStore = create<CallState>((set, get) => ({
   startCall: async ({ leadId, name, phone, phoneSlot = 'phone1' }) => {
     const { phase } = get();
     if (phase !== 'idle' && phase !== 'ended') return; // a call is already in progress
+
+    const to = cleanPhone(phone);
+    // Reject clearly-invalid E.164 numbers up front with a clear reason.
+    if (to.startsWith('+') && !isValidPhoneNumber(to)) {
+      set({ error: 'This number looks invalid. Please update it before calling.' });
+      return;
+    }
+
     await get().initDevice();
     const device = get().device;
     if (!device) {
       set({ error: 'Calling is unavailable' });
       return;
     }
-
-    const to = cleanPhone(phone);
     set({
       phase: 'connecting',
       leadId,
@@ -128,11 +183,13 @@ export const useCallStore = create<CallState>((set, get) => ({
             ? { leadId: lid, leadName: lname, phone: ph, phoneSlot: slot, durationSec, twilioCallSid: callSid }
             : null,
         });
+        // The call never connected (no talk time) → find out why from Twilio's dial result.
+        if (callSid && durationSec === 0) void get().pollDialStatus(callSid);
       };
       call.on('disconnect', finish);
       call.on('cancel', finish);
-      call.on('error', (e: { message?: string }) => {
-        set({ error: e?.message ?? 'Call error' });
+      call.on('error', (e: { code?: number; message?: string }) => {
+        set({ error: friendlyDeviceError(e) });
         finish();
       });
 
@@ -158,7 +215,30 @@ export const useCallStore = create<CallState>((set, get) => ({
     call?.disconnect();
   },
 
-  clearPending: () => set({ pending: null, phase: 'idle', leadId: null, leadName: '', phone: '' }),
+  // After a 0-duration call, poll Twilio's dial result (it arrives a moment later)
+  // and attach a human reason to the pending disposition so the user sees why.
+  pollDialStatus: async (callSid: string) => {
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (get().pending?.twilioCallSid !== callSid) return; // a new call started
+      let status: string | null = null;
+      try {
+        status = await fetchDialStatus(callSid);
+      } catch {
+        /* keep polling */
+      }
+      if (status) {
+        const reason = dialStatusReason(status);
+        set((st) => ({
+          pending: st.pending ? { ...st.pending, dialStatus: status!, resultReason: reason ?? undefined } : st.pending,
+          error: reason ?? st.error,
+        }));
+        return;
+      }
+    }
+  },
+
+  clearPending: () => set({ pending: null, phase: 'idle', leadId: null, leadName: '', phone: '', error: null }),
 
   destroy: () => {
     const { device, call } = get();

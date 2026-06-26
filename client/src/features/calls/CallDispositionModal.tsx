@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -87,6 +88,13 @@ export function CallDispositionModal() {
             {pending.phone} · Duration: {fmtDuration(pending.durationSec)}
           </p>
         </div>
+
+        {pending.resultReason && (
+          <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>{pending.resultReason}</span>
+          </div>
+        )}
 
         <div>
           <Label>Call status</Label>

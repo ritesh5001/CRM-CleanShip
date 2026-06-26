@@ -240,6 +240,30 @@ export const handleRecording = asyncHandler(async (req: Request, res: Response) 
   res.json({ success: true });
 });
 
+// POST /calls/dial-status — Twilio's <Dial> action callback. Records WHY the call
+// ended (completed/busy/no-answer/failed/canceled) so the client can show a reason.
+// Public, Twilio-signature protected. Returns empty TwiML to end the parent call.
+export const handleDialStatus = asyncHandler(async (req: Request, res: Response) => {
+  const callSid = typeof req.body.CallSid === 'string' ? req.body.CallSid : '';
+  const dialStatus = typeof req.body.DialCallStatus === 'string' ? req.body.DialCallStatus : undefined;
+  const durationSec = req.body.DialCallDuration ? Number(req.body.DialCallDuration) : undefined;
+
+  if (callSid && dialStatus) {
+    await CallRecording.updateOne(
+      { callSid },
+      { $set: { dialStatus, ...(durationSec ? { durationSec } : {}) } },
+      { upsert: true }
+    );
+  }
+  res.type('text/xml').send('<Response></Response>');
+});
+
+// GET /calls/dial-status/:callSid — lets the client poll the dial result after hangup.
+export const getDialStatus = asyncHandler(async (req: Request, res: Response) => {
+  const rec = await CallRecording.findOne({ callSid: req.params.callSid });
+  res.json({ success: true, dialStatus: rec?.dialStatus ?? null });
+});
+
 // POST /calls/status — optional call status callback; stores authoritative
 // duration/status keyed by CallSid. Public, Twilio-signature protected.
 export const handleStatus = asyncHandler(async (req: Request, res: Response) => {

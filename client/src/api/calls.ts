@@ -39,6 +39,14 @@ export async function fetchRecordingObjectUrl(callId: string): Promise<string> {
   return URL.createObjectURL(data as Blob);
 }
 
+/** Polls the dial result (completed/busy/no-answer/failed/canceled) for a Twilio call. */
+export async function fetchDialStatus(callSid: string): Promise<string | null> {
+  const { data } = await api.get<{ success: boolean; dialStatus: string | null }>(
+    `/calls/dial-status/${callSid}`
+  );
+  return data.dialStatus;
+}
+
 // Mirror of the server's DISPOSITION_TO_LEAD_STATUS for optimistic row updates.
 const DISPOSITION_TO_LEAD_STATUS: Record<Disposition, Lead['status']> = {
   interested: 'interested',

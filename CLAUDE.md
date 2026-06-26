@@ -52,8 +52,9 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 - **CallLog** — `lead, telecaller, disposition, notes, durationSec, nextFollowUpAt, phone (which of
   the contact's numbers: phone1|phone2|phone3), phoneNumber (the dialed number), twilioCallSid,
   recordingUrl`. `DISPOSITION_TO_LEAD_STATUS` maps a disposition → resulting lead status.
-- **CallRecording** — `callSid, recordingUrl, durationSec, status`. Staging area for async Twilio
-  recording/status webhooks, keyed by CallSid; `logCall` attaches it to the CallLog.
+- **CallRecording** — `callSid, recordingUrl, durationSec, status, dialStatus`. Staging area for
+  async Twilio recording/status/dial-result webhooks, keyed by CallSid; `logCall` attaches the
+  recording to the CallLog, and the client polls `dialStatus` to show why a call failed.
 - **Integration** — singleton settings doc (`key:'twilio'`): `enabled, accountSid, authToken,
   apiKeySid, apiKeySecret, twimlAppSid, callerId, recordCalls, defaultCountryCode, publicServerUrl`.
   `defaultCountryCode` (e.g. '+91') is prepended to dialled numbers lacking a country code. Managed
@@ -86,8 +87,11 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
   Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
   `GET /calls/token` (mints a Voice access token), `GET /calls/:id/recording` (auth-proxied
   recording audio stream — telecaller scoped to own calls); public Twilio webhooks
-  `POST /calls/voice` (returns Dial TwiML), `POST /calls/recording`, `POST /calls/status` — all
-  signature-verified.
+  `POST /calls/voice` (returns Dial TwiML), `POST /calls/recording`, `POST /calls/status`,
+  `POST /calls/dial-status` (Dial `action` callback → records completed/busy/no-answer/failed so the
+  client can show *why* a call failed; `GET /calls/dial-status/:callSid` polls it) — all
+  signature-verified. Numbers are editable inline by both roles (pencil on the phone actions → `PUT
+  /leads/:id`); invalid numbers are caught pre-dial with a prompt to fix.
 - **Follow-ups:** `GET /followups?scope=today|upcoming|overdue|all`, `PATCH /followups/:id/done`.
 - **Notifications:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`.
 - **Reports:** `GET /reports/overview` (admin), `GET /reports/me` (telecaller).

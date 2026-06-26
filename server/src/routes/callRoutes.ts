@@ -24,12 +24,14 @@ async function twilioWebhook(req: Request, _res: Response, next: NextFunction) {
 router.post('/voice', twilioWebhook, ctrl.handleVoice);
 router.post('/recording', twilioWebhook, ctrl.handleRecording);
 router.post('/status', twilioWebhook, ctrl.handleStatus);
+router.post('/dial-status', twilioWebhook, ctrl.handleDialStatus);
 
 // Everything below requires an authenticated user.
 router.use(authenticate);
 
 router.get('/config', ctrl.getCallConfig);
 router.get('/token', ctrl.getVoiceToken);
+router.get('/dial-status/:callSid', ctrl.getDialStatus);
 router.get('/:id/recording', ctrl.streamRecording);
 router.get('/', ctrl.listCalls);
 router.post('/', validate(logCallSchema), ctrl.logCall);
