@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Label, Select } from '@/components/ui/Field';
-import { useImportLeads, previewImportFile, type ImportPreview } from '@/api/leads';
+import { useImportLeads, previewImportFile, type ImportPreview, type ImportResult, type DuplicateStrategy } from '@/api/leads';
 import { useTelecallers } from '@/api/users';
 import { apiError } from '@/api/client';
 import { downloadImportTemplate } from '@/lib/csv';
@@ -74,9 +74,8 @@ export function ImportModal({ open, onClose }: Props) {
   const [previewing, setPreviewing] = useState(false);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [assignedTo, setAssignedTo] = useState('');
-  const [result, setResult] = useState<{ totalRows: number; successCount: number; errorCount: number } | null>(
-    null
-  );
+  const [duplicateStrategy, setDuplicateStrategy] = useState<DuplicateStrategy>('skip');
+  const [result, setResult] = useState<ImportResult | null>(null);
 
   async function onFileChange(f: File | null) {
     setFile(f);
@@ -101,7 +100,7 @@ export function ImportModal({ open, onClose }: Props) {
     if (!file) return toast.error('Choose a file first');
     if (!mapping.name || !mapping.phone) return toast.error('Map both Name and Phone columns');
     try {
-      const res = await importLeads.mutateAsync({ file, assignedTo: assignedTo || undefined, mapping });
+      const res = await importLeads.mutateAsync({ file, assignedTo: assignedTo || undefined, mapping, duplicateStrategy });
       setResult(res);
       toast.success(`Imported ${res.successCount} contacts`);
     } catch (err) {
@@ -114,6 +113,7 @@ export function ImportModal({ open, onClose }: Props) {
     setPreview(null);
     setMapping({});
     setAssignedTo('');
+    setDuplicateStrategy('skip');
     setResult(null);
     onClose();
   }
@@ -143,8 +143,14 @@ export function ImportModal({ open, onClose }: Props) {
         <div className="space-y-2 text-sm dark:text-slate-200">
           <p className="font-medium text-emerald-700 dark:text-emerald-400">Import complete ✅</p>
           <p>Total rows: {result.totalRows}</p>
-          <p>Imported: {result.successCount}</p>
-          <p>Errors/skipped: {result.errorCount}</p>
+          <p>New contacts added: {result.successCount}</p>
+          {result.updatedCount > 0 && <p>Existing contacts updated: {result.updatedCount}</p>}
+          {result.duplicateCount > 0 && (
+            <p>
+              Duplicates {duplicateStrategy === 'update' ? 'merged' : 'skipped'}: {result.duplicateCount}
+            </p>
+          )}
+          {result.errorCount > 0 && <p className="text-rose-600 dark:text-rose-400">Errors: {result.errorCount}</p>}
         </div>
       ) : (
         <div className="space-y-3">
@@ -227,6 +233,21 @@ export function ImportModal({ open, onClose }: Props) {
                 </option>
               ))}
             </Select>
+          </div>
+
+          <div>
+            <Label>If a phone number already exists</Label>
+            <Select
+              value={duplicateStrategy}
+              onChange={(e) => setDuplicateStrategy(e.target.value as DuplicateStrategy)}
+            >
+              <option value="skip">Skip it — keep the existing contact (recommended)</option>
+              <option value="update">Update the existing contact with the new details</option>
+              <option value="import">Import anyway — allow a duplicate contact</option>
+            </Select>
+            <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+              Numbers are matched even when formatted differently (e.g. “+91 70074 36164” and “917007436164”).
+            </p>
           </div>
         </div>
       )}

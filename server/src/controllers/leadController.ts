@@ -293,7 +293,12 @@ export const importLeadsHandler = asyncHandler(async (req: Request, res: Respons
     }
   }
 
-  const result = await importLeads(req.file.buffer, req.file.originalname, req.user!.id, assignedTo, mapping);
+  const duplicateStrategy =
+    req.body.duplicateStrategy === 'update' || req.body.duplicateStrategy === 'import'
+      ? req.body.duplicateStrategy
+      : 'skip';
+
+  const result = await importLeads(req.file.buffer, req.file.originalname, req.user!.id, assignedTo, mapping, duplicateStrategy);
 
   if (assignedTo && result.successCount > 0) {
     await notify({

@@ -316,6 +316,16 @@ export async function previewImportFile(file: File): Promise<ImportPreview> {
   return data.preview as ImportPreview;
 }
 
+export type DuplicateStrategy = 'skip' | 'update' | 'import';
+
+export interface ImportResult {
+  totalRows: number;
+  successCount: number;
+  updatedCount: number;
+  duplicateCount: number;
+  errorCount: number;
+}
+
 export function useImportLeads() {
   const qc = useQueryClient();
   return useMutation({
@@ -323,19 +333,22 @@ export function useImportLeads() {
       file,
       assignedTo,
       mapping,
+      duplicateStrategy,
     }: {
       file: File;
       assignedTo?: string;
       mapping?: Record<string, string>;
+      duplicateStrategy?: DuplicateStrategy;
     }) => {
       const fd = new FormData();
       fd.append('file', file);
       if (assignedTo) fd.append('assignedTo', assignedTo);
       if (mapping && Object.keys(mapping).length) fd.append('mapping', JSON.stringify(mapping));
+      if (duplicateStrategy) fd.append('duplicateStrategy', duplicateStrategy);
       const { data } = await api.post('/leads/import', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      return data.result as { totalRows: number; successCount: number; errorCount: number };
+      return data.result as ImportResult;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
   });

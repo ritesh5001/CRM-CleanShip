@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import { Lead } from '../models/Lead.js';
 import { ImportBatch } from '../models/ImportBatch.js';
+import { getTwilioSettings } from './twilioService.js';
+import { phoneKey } from '../utils/phone.js';
 
 interface RawRow {
   [key: string]: unknown;
@@ -38,10 +40,21 @@ function pickFirst(row: RawRow, groups: string[][]): string {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * How to handle a contact whose phone number already exists (in the CRM or
+ * earlier in the same file):
+ *  - `skip`   — keep the existing contact, don't import the duplicate (default).
+ *  - `update` — overwrite the existing contact's fields with the imported values.
+ *  - `import` — import it anyway as a separate contact (old behaviour).
+ */
+export type DuplicateStrategy = 'skip' | 'update' | 'import';
+
 export interface ImportResult {
   batchId: string;
   totalRows: number;
   successCount: number;
+  updatedCount: number;
+  duplicateCount: number;
   errorCount: number;
   errors: { row: number; message: string }[];
 }
@@ -86,7 +99,8 @@ export async function importLeads(
   fileName: string,
   uploadedBy: string,
   assignedTo?: string,
-  mapping?: FieldMapping
+  mapping?: FieldMapping,
+  duplicateStrategy: DuplicateStrategy = 'skip'
 ): Promise<ImportResult> {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -100,7 +114,7 @@ export async function importLeads(
   };
 
   const errors: { row: number; message: string }[] = [];
-  const docs: Record<string, unknown>[] = [];
+  const parsed: { fields: Record<string, unknown>; phone: string; row: number }[] = [];
 
   rows.forEach((row, idx) => {
     const rowNum = idx + 2; // account for header row
@@ -175,26 +189,87 @@ export async function importLeads(
       return;
     }
 
-    docs.push({
-      name: name || 'Unknown',
+    parsed.push({
       phone,
-      altPhone,
-      altPhone2,
-      email: EMAIL_RE.test(email) ? email : '',
-      title,
-      company,
-      city,
-      state,
-      country,
-      tags: industry ? [industry] : [],
-      source: source || 'import',
-      notes,
-      status: assignedTo ? 'assigned' : 'new',
-      assignedTo: assignedTo || undefined,
-      assignedAt: assignedTo ? new Date() : undefined,
-      createdBy: uploadedBy,
+      row: rowNum,
+      fields: {
+        name: name || 'Unknown',
+        phone,
+        altPhone,
+        altPhone2,
+        email: EMAIL_RE.test(email) ? email : '',
+        title,
+        company,
+        city,
+        state,
+        country,
+        tags: industry ? [industry] : [],
+        source: source || 'import',
+        notes,
+        status: assignedTo ? 'assigned' : 'new',
+        assignedTo: assignedTo || undefined,
+        assignedAt: assignedTo ? new Date() : undefined,
+        createdBy: uploadedBy,
+      },
     });
   });
+
+  // ── Duplicate detection ──
+  // Build a canonical E.164 key for each incoming number and match it against
+  // existing contacts and against earlier rows in the same file. This is what
+  // catches "+91 70074 36164" vs "917007436164" as the same contact.
+  const defaultCode = (await getTwilioSettings())?.defaultCountryCode ?? '';
+  const keyOf = (raw: string) => phoneKey(raw, defaultCode);
+
+  const existing = await Lead.find({}, { phone: 1 }).lean();
+  const existingByKey = new Map<string, unknown>();
+  for (const l of existing) {
+    const k = keyOf(String(l.phone ?? ''));
+    if (k && !existingByKey.has(k)) existingByKey.set(k, l._id);
+  }
+
+  const docs: Record<string, unknown>[] = [];
+  const updates: { id: unknown; fields: Record<string, unknown> }[] = [];
+  const seenInFile = new Set<string>();
+  let duplicateCount = 0;
+
+  for (const p of parsed) {
+    const key = keyOf(p.phone);
+
+    if (duplicateStrategy !== 'import' && key) {
+      if (seenInFile.has(key)) {
+        // Same number appears twice in the uploaded file → keep the first only.
+        duplicateCount++;
+        continue;
+      }
+      seenInFile.add(key);
+
+      const existingId = existingByKey.get(key);
+      if (existingId) {
+        if (duplicateStrategy === 'update') {
+          updates.push({ id: existingId, fields: p.fields });
+        } else {
+          duplicateCount++;
+        }
+        continue;
+      }
+    }
+
+    docs.push(p.fields);
+  }
+
+  // ── Apply updates (overwrite existing contacts, skipping blank incoming values) ──
+  let updatedCount = 0;
+  if (updates.length) {
+    const ops = updates.map(({ id, fields }) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: buildUpdateSet(fields) },
+      },
+    }));
+    const res = await Lead.bulkWrite(ops, { ordered: false }).catch(() => null);
+    updatedCount = res?.modifiedCount ?? updates.length;
+  }
 
   let inserted: { _id: unknown }[] = [];
   if (docs.length) {
@@ -227,7 +302,34 @@ export async function importLeads(
     batchId: String(batch._id),
     totalRows: rows.length,
     successCount,
+    updatedCount,
+    duplicateCount,
     errorCount: errors.length,
     errors: errors.slice(0, 50),
   };
+}
+
+/**
+ * Builds the `$set` for updating an existing contact from imported values:
+ * only non-empty fields overwrite, so a sparse import row never wipes existing
+ * data. `assignedTo` is applied (with its side effects) only when provided.
+ */
+function buildUpdateSet(fields: Record<string, unknown>): Record<string, unknown> {
+  const set: Record<string, unknown> = {};
+  const copyIfPresent = ['name', 'phone', 'altPhone', 'altPhone2', 'email', 'title', 'company', 'city', 'state', 'country', 'notes', 'source'];
+  for (const k of copyIfPresent) {
+    const v = fields[k];
+    // Don't let the "Unknown" name placeholder overwrite a real existing name.
+    if (k === 'name' && v === 'Unknown') continue;
+    if (typeof v === 'string' && v.trim()) set[k] = v;
+    else if (v != null && typeof v !== 'string') set[k] = v;
+  }
+  const tags = fields.tags;
+  if (Array.isArray(tags) && tags.length) set.tags = tags;
+  if (fields.assignedTo) {
+    set.assignedTo = fields.assignedTo;
+    set.assignedAt = fields.assignedAt ?? new Date();
+    set.status = 'assigned';
+  }
+  return set;
 }
