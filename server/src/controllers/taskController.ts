@@ -8,7 +8,7 @@ import { notify } from '../services/notificationService.js';
 import { idOf } from '../utils/idOf.js';
 
 function buildFilter(req: Request): Record<string, unknown> {
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = { workspace: req.workspaceId };
   if (req.user!.role === 'telecaller') {
     filter.assignedTo = req.user!.id;
   } else if (typeof req.query.assignedTo === 'string' && req.query.assignedTo) {
@@ -38,7 +38,7 @@ export const listTasks = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findById(req.params.id)
+  const task = await Task.findOne({ _id: req.params.id, workspace: req.workspaceId })
     .populate('assignedTo', 'name email')
     .populate('relatedLead', 'name phone');
   if (!task) throw ApiError.notFound('Task not found');
@@ -49,28 +49,38 @@ export const getTask = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createTask = asyncHandler(async (req: Request, res: Response) => {
-  const assignee = await User.findOne({ _id: req.body.assignedTo, role: 'telecaller', isActive: true });
+  const assignee = await User.findOne({
+    _id: req.body.assignedTo,
+    role: 'telecaller',
+    isActive: true,
+    workspace: req.workspaceId,
+  });
   if (!assignee) throw ApiError.badRequest('Invalid or inactive telecaller');
 
-  const task = await Task.create({ ...req.body, assignedBy: req.user!.id });
+  const task = await Task.create({ ...req.body, assignedBy: req.user!.id, workspace: req.workspaceId });
   await notify({
     recipient: String(task.assignedTo),
     type: 'task_assigned',
     title: 'New task assigned',
     message: task.title,
     link: `/tasks/${task._id}`,
+    workspace: req.workspaceId,
   });
   res.status(201).json({ success: true, task });
 });
 
 export const updateTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+  const task = await Task.findOneAndUpdate(
+    { _id: req.params.id, workspace: req.workspaceId },
+    { $set: req.body },
+    { new: true }
+  );
   if (!task) throw ApiError.notFound('Task not found');
   res.json({ success: true, task });
 });
 
 export const updateTaskStatus = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findById(req.params.id);
+  const task = await Task.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!task) throw ApiError.notFound('Task not found');
 
   // Telecallers can only update status of their own tasks.
@@ -90,13 +100,14 @@ export const updateTaskStatus = asyncHandler(async (req: Request, res: Response)
       title: 'Task completed',
       message: `${req.user!.name} completed "${task.title}"`,
       link: `/tasks/${task._id}`,
+      workspace: req.workspaceId,
     });
   }
   res.json({ success: true, task });
 });
 
 export const deleteTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findByIdAndDelete(req.params.id);
+  const task = await Task.findOneAndDelete({ _id: req.params.id, workspace: req.workspaceId });
   if (!task) throw ApiError.notFound('Task not found');
   res.json({ success: true, message: 'Task deleted' });
 });

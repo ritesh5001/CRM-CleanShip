@@ -3,12 +3,14 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LogOut, Phone, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
+import { useWorkspaceStore } from '@/store/workspace';
 import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
 import { CallBar } from '@/features/calls/CallBar';
 import { CallDispositionModal } from '@/features/calls/CallDispositionModal';
 import { NAV } from './nav';
 import { NotificationBell } from './NotificationBell';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
@@ -26,10 +28,12 @@ export function AppLayout() {
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const navigate = useNavigate();
+  const clearWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const items = user ? NAV[user.role] : [];
 
   function handleLogout() {
     logout();
+    clearWorkspace(null);
     navigate('/login');
   }
 
@@ -93,12 +97,7 @@ export function AppLayout() {
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-          <div className="md:hidden">
-            <span className="font-bold text-slate-800 dark:text-slate-100">CleanShip CRM</span>
-          </div>
-          <div className="hidden text-sm text-slate-500 dark:text-slate-400 md:block">
-            {user?.role === 'superadmin' ? 'Administrator' : 'User'} workspace
-          </div>
+          <WorkspaceSwitcher />
           <div className="flex items-center gap-3">
             <button
               onClick={toggleTheme}

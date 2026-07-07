@@ -18,7 +18,7 @@ function endOfToday() {
 // GET /followups?scope=today|upcoming|overdue|all
 export const listFollowUps = asyncHandler(async (req: Request, res: Response) => {
   const pg = getPagination(req.query);
-  const filter: Record<string, unknown> = { status: 'pending' };
+  const filter: Record<string, unknown> = { status: 'pending', workspace: req.workspaceId };
 
   if (req.user!.role === 'telecaller') {
     filter.telecaller = req.user!.id;
@@ -50,7 +50,7 @@ export const listFollowUps = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const markFollowUpDone = asyncHandler(async (req: Request, res: Response) => {
-  const followUp = await FollowUp.findById(req.params.id);
+  const followUp = await FollowUp.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!followUp) throw ApiError.notFound('Follow-up not found');
   if (req.user!.role === 'telecaller' && String(followUp.telecaller) !== req.user!.id) {
     throw ApiError.forbidden('This follow-up is not assigned to you');

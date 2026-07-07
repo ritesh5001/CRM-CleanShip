@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import * as ctrl from '../controllers/callController.js';
 import { authenticate } from '../middleware/auth.js';
+import { resolveWorkspace, requireWorkspace } from '../middleware/workspace.js';
 import { validate } from '../middleware/validate.js';
 import { logCallSchema } from '../validators/callValidators.js';
 import { isEnabled, validateSignature } from '../services/twilioService.js';
@@ -26,8 +27,8 @@ router.post('/recording', twilioWebhook, ctrl.handleRecording);
 router.post('/status', twilioWebhook, ctrl.handleStatus);
 router.post('/dial-status', twilioWebhook, ctrl.handleDialStatus);
 
-// Everything below requires an authenticated user.
-router.use(authenticate);
+// Everything below requires an authenticated user in an active workspace.
+router.use(authenticate, resolveWorkspace, requireWorkspace);
 
 router.get('/config', ctrl.getCallConfig);
 router.get('/token', ctrl.getVoiceToken);

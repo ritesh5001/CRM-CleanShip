@@ -10,6 +10,7 @@ const followUpSchema = new Schema(
     status: { type: String, enum: FOLLOWUP_STATUSES, default: 'pending', index: true },
     notes: { type: String, default: '' },
     callLog: { type: Types.ObjectId, ref: 'CallLog' },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', required: true, index: true },
   },
   { timestamps: true }
 );

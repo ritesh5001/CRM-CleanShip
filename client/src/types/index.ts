@@ -2,6 +2,14 @@ export type Role = 'superadmin' | 'telecaller';
 
 export type Density = 'comfortable' | 'compact';
 
+export interface Workspace {
+  _id: string;
+  name: string;
+  isActive?: boolean;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export interface User {
   _id: string;
   id?: string;
@@ -12,6 +20,8 @@ export interface User {
   isActive: boolean;
   dailyTarget: number;
   twilioNumber?: string;
+  // The workspace a telecaller belongs to (absent for the superadmin).
+  workspace?: string;
   lastLoginAt?: string;
   createdAt: string;
 }

@@ -8,7 +8,7 @@ import type { CreateUserInput, UpdateUserInput } from '../validators/userValidat
 // GET /users — list telecallers (superadmin). Supports ?search=&isActive=&page=&limit=
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
   const pg = getPagination(req.query);
-  const filter: Record<string, unknown> = { role: 'telecaller' };
+  const filter: Record<string, unknown> = { role: 'telecaller', workspace: req.workspaceId };
 
   if (typeof req.query.search === 'string' && req.query.search.trim()) {
     const rx = new RegExp(req.query.search.trim(), 'i');
@@ -27,13 +27,14 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getUser = asyncHandler(async (req: Request, res: Response) => {
-  const user = await User.findOne({ _id: req.params.id, role: 'telecaller' });
+  const user = await User.findOne({ _id: req.params.id, role: 'telecaller', workspace: req.workspaceId });
   if (!user) throw ApiError.notFound('Telecaller not found');
   res.json({ success: true, user });
 });
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as CreateUserInput;
+  // Email is globally unique — a telecaller belongs to exactly one workspace.
   const exists = await User.findOne({ email: body.email });
   if (exists) throw ApiError.conflict('A user with this email already exists');
 
@@ -43,6 +44,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     phone: body.phone ?? '',
     role: 'telecaller',
     dailyTarget: body.dailyTarget ?? 50,
+    workspace: req.workspaceId,
     createdBy: req.user!.id,
   });
   await user.setPassword(body.password);
@@ -54,7 +56,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as UpdateUserInput;
   const user = await User.findOneAndUpdate(
-    { _id: req.params.id, role: 'telecaller' },
+    { _id: req.params.id, role: 'telecaller', workspace: req.workspaceId },
     { $set: body },
     { new: true }
   );
@@ -64,7 +66,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
 export const setUserStatus = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOneAndUpdate(
-    { _id: req.params.id, role: 'telecaller' },
+    { _id: req.params.id, role: 'telecaller', workspace: req.workspaceId },
     { $set: { isActive: req.body.isActive } },
     { new: true }
   );
@@ -74,7 +76,7 @@ export const setUserStatus = asyncHandler(async (req: Request, res: Response) =>
 
 export const setUserTarget = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOneAndUpdate(
-    { _id: req.params.id, role: 'telecaller' },
+    { _id: req.params.id, role: 'telecaller', workspace: req.workspaceId },
     { $set: { dailyTarget: req.body.dailyTarget } },
     { new: true }
   );
@@ -85,7 +87,7 @@ export const setUserTarget = asyncHandler(async (req: Request, res: Response) =>
 // Assign (or clear, with '') the Twilio caller-ID number a telecaller dials from.
 export const setUserTwilioNumber = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOneAndUpdate(
-    { _id: req.params.id, role: 'telecaller' },
+    { _id: req.params.id, role: 'telecaller', workspace: req.workspaceId },
     { $set: { twilioNumber: req.body.twilioNumber } },
     { new: true }
   );
@@ -94,7 +96,7 @@ export const setUserTwilioNumber = asyncHandler(async (req: Request, res: Respon
 });
 
 export const resetUserPassword = asyncHandler(async (req: Request, res: Response) => {
-  const user = await User.findOne({ _id: req.params.id, role: 'telecaller' }).select('+passwordHash');
+  const user = await User.findOne({ _id: req.params.id, role: 'telecaller', workspace: req.workspaceId }).select('+passwordHash');
   if (!user) throw ApiError.notFound('Telecaller not found');
   await user.setPassword(req.body.newPassword);
   await user.save();
@@ -102,7 +104,7 @@ export const resetUserPassword = asyncHandler(async (req: Request, res: Response
 });
 
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const user = await User.findOneAndDelete({ _id: req.params.id, role: 'telecaller' });
+  const user = await User.findOneAndDelete({ _id: req.params.id, role: 'telecaller', workspace: req.workspaceId });
   if (!user) throw ApiError.notFound('Telecaller not found');
   res.json({ success: true, message: 'Telecaller deleted' });
 });

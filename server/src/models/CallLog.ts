@@ -50,6 +50,7 @@ const callLogSchema = new Schema(
     // Twilio call correlation (set when the call was placed via the browser softphone).
     twilioCallSid: { type: String, index: true },
     recordingUrl: { type: String },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', required: true, index: true },
   },
   { timestamps: true }
 );

@@ -13,6 +13,9 @@ export interface IUser {
   isActive: boolean;
   dailyTarget: number;
   twilioNumber: string; // Twilio caller ID assigned to this telecaller (E.164), '' if none
+  // The workspace a telecaller belongs to. Absent for the superadmin, who is
+  // global (shared across all workspaces).
+  workspace?: Types.ObjectId;
   createdBy?: Types.ObjectId;
   lastLoginAt?: Date;
   createdAt: Date;
@@ -37,6 +40,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     isActive: { type: Boolean, default: true },
     dailyTarget: { type: Number, default: 50, min: 0 },
     twilioNumber: { type: String, trim: true, default: '' },
+    workspace: { type: Schema.Types.ObjectId, ref: 'Workspace', index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
     lastLoginAt: { type: Date },
   },

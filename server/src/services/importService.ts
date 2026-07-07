@@ -98,6 +98,7 @@ export async function importLeads(
   buffer: Buffer,
   fileName: string,
   uploadedBy: string,
+  workspace: string,
   assignedTo?: string,
   mapping?: FieldMapping,
   duplicateStrategy: DuplicateStrategy = 'skip'
@@ -210,6 +211,7 @@ export async function importLeads(
         assignedTo: assignedTo || undefined,
         assignedAt: assignedTo ? new Date() : undefined,
         createdBy: uploadedBy,
+        workspace,
       },
     });
   });
@@ -221,7 +223,7 @@ export async function importLeads(
   const defaultCode = (await getTwilioSettings())?.defaultCountryCode ?? '';
   const keyOf = (raw: string) => phoneKey(raw, defaultCode);
 
-  const existing = await Lead.find({}, { phone: 1 }).lean();
+  const existing = await Lead.find({ workspace }, { phone: 1 }).lean();
   const existingByKey = new Map<string, unknown>();
   for (const l of existing) {
     const k = keyOf(String(l.phone ?? ''));
@@ -285,6 +287,7 @@ export async function importLeads(
   const batch = await ImportBatch.create({
     fileName,
     uploadedBy,
+    workspace,
     totalRows: rows.length,
     successCount,
     errorCount: errors.length,

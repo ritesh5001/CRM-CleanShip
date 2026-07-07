@@ -9,6 +9,7 @@
     "dev:client": "npm --prefix client run dev",
     "build": "npm --prefix server run build && npm --prefix client run build",
     "seed": "npm --prefix server run seed",
+    "migrate:workspaces": "npm --prefix server run migrate:workspaces",
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck"
   },

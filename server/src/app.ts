@@ -24,6 +24,8 @@ export function createApp() {
         callback(new Error(`Origin not allowed by CORS: ${origin}`));
       },
       credentials: true,
+      // X-Workspace-Id is how the superadmin's browser selects the active workspace.
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
     })
   );
   app.use(express.json({ limit: '1mb' }));

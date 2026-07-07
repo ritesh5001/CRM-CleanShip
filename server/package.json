@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "seed": "tsx src/seed/index.ts",
+    "migrate:workspaces": "tsx src/scripts/migrateWorkspaces.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

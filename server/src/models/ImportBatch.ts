@@ -8,6 +8,7 @@ const importBatchSchema = new Schema(
     successCount: { type: Number, default: 0 },
     errorCount: { type: Number, default: 0 },
     errors: { type: [{ row: Number, message: String }], default: [] },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', index: true },
   },
   { timestamps: true }
 );

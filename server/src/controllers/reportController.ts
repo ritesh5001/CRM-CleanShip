@@ -18,9 +18,10 @@ function endOfToday() {
   return d;
 }
 
-// GET /reports/overview — superadmin dashboard.
-export const overview = asyncHandler(async (_req: Request, res: Response) => {
+// GET /reports/overview — superadmin dashboard (scoped to the active workspace).
+export const overview = asyncHandler(async (req: Request, res: Response) => {
   const today = { $gte: startOfToday(), $lte: endOfToday() };
+  const ws = new Types.ObjectId(req.workspaceId);
 
   const [
     totalTelecallers,
@@ -32,15 +33,15 @@ export const overview = asyncHandler(async (_req: Request, res: Response) => {
     pendingTasks,
     perTelecaller,
   ] = await Promise.all([
-    User.countDocuments({ role: 'telecaller' }),
-    User.countDocuments({ role: 'telecaller', isActive: true }),
-    Lead.countDocuments({}),
-    Lead.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    CallLog.countDocuments({ createdAt: today }),
-    CallLog.aggregate([{ $group: { _id: '$disposition', count: { $sum: 1 } } }]),
-    Task.countDocuments({ status: { $in: ['pending', 'in_progress'] } }),
+    User.countDocuments({ role: 'telecaller', workspace: ws }),
+    User.countDocuments({ role: 'telecaller', isActive: true, workspace: ws }),
+    Lead.countDocuments({ workspace: ws }),
+    Lead.aggregate([{ $match: { workspace: ws } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    CallLog.countDocuments({ workspace: ws, createdAt: today }),
+    CallLog.aggregate([{ $match: { workspace: ws } }, { $group: { _id: '$disposition', count: { $sum: 1 } } }]),
+    Task.countDocuments({ workspace: ws, status: { $in: ['pending', 'in_progress'] } }),
     CallLog.aggregate([
-      { $match: { createdAt: today } },
+      { $match: { workspace: ws, createdAt: today } },
       { $group: { _id: '$telecaller', calls: { $sum: 1 } } },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
       { $unwind: '$user' },
@@ -78,23 +79,25 @@ export const overview = asyncHandler(async (_req: Request, res: Response) => {
 // GET /reports/me — telecaller's personal dashboard.
 export const myStats = asyncHandler(async (req: Request, res: Response) => {
   const uid = new Types.ObjectId(req.user!.id);
+  const ws = new Types.ObjectId(req.workspaceId);
   const today = { $gte: startOfToday(), $lte: endOfToday() };
 
   const [user, callsToday, myContacts, myLeads, pendingTasks, followUpsToday, overdueFollowUps, dispToday] =
     await Promise.all([
       User.findById(uid).select('dailyTarget name'),
-      CallLog.countDocuments({ telecaller: uid, createdAt: today }),
-      Lead.countDocuments({ assignedTo: uid }),
-      Lead.countDocuments({ assignedTo: uid, qualified: true }),
-      Task.countDocuments({ assignedTo: uid, status: { $in: ['pending', 'in_progress'] } }),
-      FollowUp.countDocuments({ telecaller: uid, status: 'pending', scheduledAt: today }),
+      CallLog.countDocuments({ telecaller: uid, workspace: ws, createdAt: today }),
+      Lead.countDocuments({ assignedTo: uid, workspace: ws }),
+      Lead.countDocuments({ assignedTo: uid, workspace: ws, qualified: true }),
+      Task.countDocuments({ assignedTo: uid, workspace: ws, status: { $in: ['pending', 'in_progress'] } }),
+      FollowUp.countDocuments({ telecaller: uid, workspace: ws, status: 'pending', scheduledAt: today }),
       FollowUp.countDocuments({
         telecaller: uid,
+        workspace: ws,
         status: 'pending',
         scheduledAt: { $lt: startOfToday() },
       }),
       CallLog.aggregate([
-        { $match: { telecaller: uid, createdAt: today } },
+        { $match: { telecaller: uid, workspace: ws, createdAt: today } },
         { $group: { _id: '$disposition', count: { $sum: 1 } } },
       ]),
     ]);

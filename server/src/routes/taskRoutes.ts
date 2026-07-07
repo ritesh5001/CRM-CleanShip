@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as ctrl from '../controllers/taskController.js';
 import { authenticate } from '../middleware/auth.js';
+import { resolveWorkspace, requireWorkspace } from '../middleware/workspace.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { validate } from '../middleware/validate.js';
 import {
@@ -10,7 +11,7 @@ import {
 } from '../validators/taskValidators.js';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, resolveWorkspace, requireWorkspace);
 
 router.get('/', ctrl.listTasks);
 router.post('/', requireRole('superadmin'), validate(createTaskSchema), ctrl.createTask);

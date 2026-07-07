@@ -95,6 +95,7 @@ const leadSchema = new Schema(
     phone3Outcome: { type: phoneOutcomeSchema, default: () => ({}) },
     createdBy: { type: Types.ObjectId, ref: 'User' },
     importBatch: { type: Types.ObjectId, ref: 'ImportBatch' },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', required: true, index: true },
   },
   { timestamps: true }
 );

@@ -16,7 +16,8 @@ import type { PhoneOutcomeInput } from '../validators/leadValidators.js';
 // Builds the Mongo filter from query params. `includeCallStatus=false` is used by
 // the stats endpoint so chip counts reflect every callStatus within the same scope.
 function buildFilter(req: Request, includeCallStatus = true): Record<string, unknown> {
-  const filter: Record<string, unknown> = {};
+  // Every query is scoped to the active workspace.
+  const filter: Record<string, unknown> = { workspace: req.workspaceId };
 
   // Telecallers only ever see their own leads.
   if (req.user!.role === 'telecaller') {
@@ -102,7 +103,10 @@ export const exportLeads = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getLead = asyncHandler(async (req: Request, res: Response) => {
-  const lead = await Lead.findById(req.params.id).populate('assignedTo', 'name email');
+  const lead = await Lead.findOne({ _id: req.params.id, workspace: req.workspaceId }).populate(
+    'assignedTo',
+    'name email'
+  );
   if (!lead) throw ApiError.notFound('Lead not found');
   if (req.user!.role === 'telecaller' && idOf(lead.assignedTo) !== req.user!.id) {
     throw ApiError.forbidden('This lead is not assigned to you');
@@ -116,7 +120,7 @@ export const createLead = asyncHandler(async (req: Request, res: Response) => {
     body.status = 'assigned';
     body.assignedAt = new Date();
   }
-  const lead = await Lead.create({ ...body, createdBy: req.user!.id });
+  const lead = await Lead.create({ ...body, createdBy: req.user!.id, workspace: req.workspaceId });
 
   if (lead.assignedTo) {
     await notify({
@@ -125,13 +129,14 @@ export const createLead = asyncHandler(async (req: Request, res: Response) => {
       title: 'New lead assigned',
       message: `${lead.name} (${lead.phone})`,
       link: `/leads/${lead._id}`,
+      workspace: req.workspaceId,
     });
   }
   res.status(201).json({ success: true, lead });
 });
 
 export const updateLead = asyncHandler(async (req: Request, res: Response) => {
-  const lead = await Lead.findById(req.params.id);
+  const lead = await Lead.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Lead not found');
   if (req.user!.role === 'telecaller' && String(lead.assignedTo) !== req.user!.id) {
     throw ApiError.forbidden('This lead is not assigned to you');
@@ -142,14 +147,14 @@ export const updateLead = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteLead = asyncHandler(async (req: Request, res: Response) => {
-  const lead = await Lead.findByIdAndDelete(req.params.id);
+  const lead = await Lead.findOneAndDelete({ _id: req.params.id, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Lead not found');
   res.json({ success: true, message: 'Lead deleted' });
 });
 
 // POST /leads/:id/followup — schedule a follow-up inline (no CallLog logged).
 export const scheduleFollowUp = asyncHandler(async (req: Request, res: Response) => {
-  const lead = await Lead.findById(req.params.id);
+  const lead = await Lead.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Contact not found');
 
   // Telecallers may only schedule follow-ups on contacts assigned to them.
@@ -165,6 +170,7 @@ export const scheduleFollowUp = asyncHandler(async (req: Request, res: Response)
     telecaller,
     scheduledAt: req.body.scheduledAt,
     notes: req.body.notes,
+    workspace: req.workspaceId,
   });
 
   lead.nextFollowUpAt = req.body.scheduledAt;
@@ -178,6 +184,7 @@ export const scheduleFollowUp = asyncHandler(async (req: Request, res: Response)
       title: `Follow-up scheduled: ${lead.name}`,
       message: `Scheduled for ${new Date(req.body.scheduledAt).toLocaleString()}`,
       link: '/followups',
+      workspace: req.workspaceId,
     });
   }
 
@@ -186,7 +193,7 @@ export const scheduleFollowUp = asyncHandler(async (req: Request, res: Response)
 
 // POST /leads/:id/remarks — both roles add to the shared remark timeline.
 export const addRemark = asyncHandler(async (req: Request, res: Response) => {
-  const lead = await Lead.findById(req.params.id);
+  const lead = await Lead.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Contact not found');
 
   // Telecallers may only remark on contacts assigned to them.
@@ -213,22 +220,25 @@ export const addRemark = asyncHandler(async (req: Request, res: Response) => {
       title: `New remark on ${lead.name}`,
       message: req.body.text,
       link: `/contacts`,
+      workspace: req.workspaceId,
     });
   }
 
   res.status(201).json({ success: true, lead });
 });
 
-async function assertTelecaller(id: string) {
-  const u = await User.findOne({ _id: id, role: 'telecaller', isActive: true });
+// Verifies the assignee is an active telecaller *in the same workspace* — you can
+// never assign a contact/task to a telecaller from another workspace.
+async function assertTelecaller(id: string, workspace: string | undefined) {
+  const u = await User.findOne({ _id: id, role: 'telecaller', isActive: true, workspace });
   if (!u) throw ApiError.badRequest('Invalid or inactive telecaller');
   return u;
 }
 
 export const assignLead = asyncHandler(async (req: Request, res: Response) => {
-  await assertTelecaller(req.body.assignedTo);
-  const lead = await Lead.findByIdAndUpdate(
-    req.params.id,
+  await assertTelecaller(req.body.assignedTo, req.workspaceId);
+  const lead = await Lead.findOneAndUpdate(
+    { _id: req.params.id, workspace: req.workspaceId },
     { $set: { assignedTo: req.body.assignedTo, assignedAt: new Date(), status: 'assigned' } },
     { new: true }
   );
@@ -240,16 +250,17 @@ export const assignLead = asyncHandler(async (req: Request, res: Response) => {
     title: 'New lead assigned',
     message: `${lead.name} (${lead.phone})`,
     link: `/leads/${lead._id}`,
+    workspace: req.workspaceId,
   });
   res.json({ success: true, lead });
 });
 
 export const bulkAssignLeads = asyncHandler(async (req: Request, res: Response) => {
   const { leadIds, assignedTo } = req.body as { leadIds: string[]; assignedTo: string };
-  await assertTelecaller(assignedTo);
+  await assertTelecaller(assignedTo, req.workspaceId);
 
   const result = await Lead.updateMany(
-    { _id: { $in: leadIds } },
+    { _id: { $in: leadIds }, workspace: req.workspaceId },
     { $set: { assignedTo, assignedAt: new Date(), status: 'assigned' } }
   );
 
@@ -259,6 +270,7 @@ export const bulkAssignLeads = asyncHandler(async (req: Request, res: Response) 
     title: `${result.modifiedCount} leads assigned`,
     message: 'New leads have been assigned to you',
     link: '/leads',
+    workspace: req.workspaceId,
   });
 
   res.json({ success: true, modified: result.modifiedCount });
@@ -266,7 +278,7 @@ export const bulkAssignLeads = asyncHandler(async (req: Request, res: Response) 
 
 export const bulkDeleteLeads = asyncHandler(async (req: Request, res: Response) => {
   const { leadIds } = req.body as { leadIds: string[] };
-  const result = await Lead.deleteMany({ _id: { $in: leadIds } });
+  const result = await Lead.deleteMany({ _id: { $in: leadIds }, workspace: req.workspaceId });
   res.json({ success: true, deleted: result.deletedCount });
 });
 
@@ -281,7 +293,7 @@ export const previewImportHandler = asyncHandler(async (req: Request, res: Respo
 export const importLeadsHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) throw ApiError.badRequest('No file uploaded (field name must be "file")');
   const assignedTo = typeof req.body.assignedTo === 'string' && req.body.assignedTo ? req.body.assignedTo : undefined;
-  if (assignedTo) await assertTelecaller(assignedTo);
+  if (assignedTo) await assertTelecaller(assignedTo, req.workspaceId);
 
   // Optional admin-defined column mapping (sent as a JSON string in the multipart body).
   let mapping: FieldMapping | undefined;
@@ -298,7 +310,15 @@ export const importLeadsHandler = asyncHandler(async (req: Request, res: Respons
       ? req.body.duplicateStrategy
       : 'skip';
 
-  const result = await importLeads(req.file.buffer, req.file.originalname, req.user!.id, assignedTo, mapping, duplicateStrategy);
+  const result = await importLeads(
+    req.file.buffer,
+    req.file.originalname,
+    req.user!.id,
+    req.workspaceId!,
+    assignedTo,
+    mapping,
+    duplicateStrategy
+  );
 
   if (assignedTo && result.successCount > 0) {
     await notify({
@@ -307,6 +327,7 @@ export const importLeadsHandler = asyncHandler(async (req: Request, res: Respons
       title: `${result.successCount} leads assigned`,
       message: 'Imported leads have been assigned to you',
       link: '/leads',
+      workspace: req.workspaceId,
     });
   }
   res.status(201).json({ success: true, result });
@@ -315,7 +336,7 @@ export const importLeadsHandler = asyncHandler(async (req: Request, res: Respons
 export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Response) => {
   const { phone, callStatus, leadOutcome, remark } = req.body as PhoneOutcomeInput;
 
-  const lead = await Lead.findById(req.params.id);
+  const lead = await Lead.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Contact not found');
 
   if (req.user!.role === 'telecaller' && idOf(lead.assignedTo) !== req.user!.id) {
@@ -344,6 +365,7 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
           telecaller,
           scheduledAt: followUpAt,
           notes: 'Auto-scheduled 2 weeks after connected call',
+          workspace: req.workspaceId,
         });
       }
     } else if (callStatus === 'not_connected') {
@@ -363,6 +385,7 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
           telecaller,
           scheduledAt: followUpAt,
           notes: 'Auto-scheduled 1 week after not-connected call',
+          workspace: req.workspaceId,
         });
       }
     }
@@ -402,6 +425,7 @@ export const updatePhoneOutcome = asyncHandler(async (req: Request, res: Respons
       phone,
       phoneNumber: number || '',
       notes: remark?.trim() || '',
+      workspace: req.workspaceId,
     });
   }
 

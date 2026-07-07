@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
+import { useWorkspaceStore } from '@/store/workspace';
 
 // Resolves the API base URL. In local dev VITE_API_URL is unset and requests
 // go through the Vite proxy at `/api/v1`. In production set VITE_API_URL to the
@@ -16,10 +17,12 @@ export const api = axios.create({
   baseURL: resolveBaseUrl(),
 });
 
-// Attach JWT to every request.
+// Attach JWT + the selected workspace to every request.
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+  if (workspaceId) config.headers['X-Workspace-Id'] = workspaceId;
   return config;
 });
 

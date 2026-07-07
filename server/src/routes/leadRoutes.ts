@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as ctrl from '../controllers/leadController.js';
 import { authenticate } from '../middleware/auth.js';
+import { resolveWorkspace, requireWorkspace } from '../middleware/workspace.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { validate } from '../middleware/validate.js';
 import { uploadSpreadsheet } from '../middleware/upload.js';
@@ -16,7 +17,7 @@ import {
 } from '../validators/leadValidators.js';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, resolveWorkspace, requireWorkspace);
 
 // Reads — both roles (telecaller results are scoped to their own leads in the controller).
 router.get('/', ctrl.listLeads);

@@ -6,13 +6,13 @@ import { getPagination, paginated } from '../utils/pagination.js';
 
 export const listNotifications = asyncHandler(async (req: Request, res: Response) => {
   const pg = getPagination(req.query);
-  const filter: Record<string, unknown> = { recipient: req.user!.id };
+  const filter: Record<string, unknown> = { recipient: req.user!.id, workspace: req.workspaceId };
   if (req.query.unread === 'true') filter.isRead = false;
 
   const [items, total, unreadCount] = await Promise.all([
     Notification.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit),
     Notification.countDocuments(filter),
-    Notification.countDocuments({ recipient: req.user!.id, isRead: false }),
+    Notification.countDocuments({ recipient: req.user!.id, workspace: req.workspaceId, isRead: false }),
   ]);
 
   res.json({ success: true, unreadCount, ...paginated(items, total, pg) });
@@ -20,7 +20,7 @@ export const listNotifications = asyncHandler(async (req: Request, res: Response
 
 export const markRead = asyncHandler(async (req: Request, res: Response) => {
   const n = await Notification.findOneAndUpdate(
-    { _id: req.params.id, recipient: req.user!.id },
+    { _id: req.params.id, recipient: req.user!.id, workspace: req.workspaceId },
     { $set: { isRead: true } },
     { new: true }
   );
@@ -29,6 +29,9 @@ export const markRead = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const markAllRead = asyncHandler(async (req: Request, res: Response) => {
-  await Notification.updateMany({ recipient: req.user!.id, isRead: false }, { $set: { isRead: true } });
+  await Notification.updateMany(
+    { recipient: req.user!.id, workspace: req.workspaceId, isRead: false },
+    { $set: { isRead: true } }
+  );
   res.json({ success: true, message: 'All notifications marked read' });
 });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as ctrl from '../controllers/userController.js';
 import { authenticate } from '../middleware/auth.js';
+import { resolveWorkspace, requireWorkspace } from '../middleware/workspace.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { validate } from '../middleware/validate.js';
 import {
@@ -14,8 +15,8 @@ import {
 
 const router = Router();
 
-// All telecaller management is superadmin-only.
-router.use(authenticate, requireRole('superadmin'));
+// All telecaller management is superadmin-only, scoped to the active workspace.
+router.use(authenticate, resolveWorkspace, requireWorkspace, requireRole('superadmin'));
 
 router.get('/', ctrl.listUsers);
 router.post('/', validate(createUserSchema), ctrl.createUser);

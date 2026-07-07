@@ -16,6 +16,7 @@ const taskSchema = new Schema(
     priority: { type: String, enum: TASK_PRIORITIES, default: 'medium' },
     status: { type: String, enum: TASK_STATUSES, default: 'pending', index: true },
     completedAt: { type: Date },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', required: true, index: true },
   },
   { timestamps: true }
 );

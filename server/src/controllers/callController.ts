@@ -45,7 +45,7 @@ const DISPOSITION_TO_PHONE_OUTCOME: Record<
 // callStatus 'not_done' → records the attempt only (no CallLog, no outcome).
 export const logCall = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as LogCallInput;
-  const lead = await Lead.findById(body.lead);
+  const lead = await Lead.findOne({ _id: body.lead, workspace: req.workspaceId });
   if (!lead) throw ApiError.notFound('Contact not found');
 
   // Telecallers may only update contacts assigned to them.
@@ -73,6 +73,7 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
     twilioCallSid: body.twilioCallSid,
     phone: body.phone,
     phoneNumber: body.phoneNumber,
+    workspace: req.workspaceId,
   });
 
   // Attach a Twilio recording if its webhook already landed (see CallRecording).
@@ -107,6 +108,7 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
         scheduledAt: body.nextFollowUpAt,
         notes: body.notes || body.remark,
         callLog: callLog._id,
+        workspace: req.workspaceId,
       });
     }
   } else {
@@ -138,7 +140,7 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
 // GET /calls?lead=  — call history; telecallers scoped to their own logs.
 export const listCalls = asyncHandler(async (req: Request, res: Response) => {
   const pg = getPagination(req.query);
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = { workspace: req.workspaceId };
 
   if (req.user!.role === 'telecaller') {
     filter.telecaller = req.user!.id;
@@ -163,7 +165,7 @@ export const listCalls = asyncHandler(async (req: Request, res: Response) => {
 // GET /calls/:id/recording — streams a call's recording audio, proxied + authed
 // against Twilio. Telecallers can only access their own calls.
 export const streamRecording = asyncHandler(async (req: Request, res: Response) => {
-  const call = await CallLog.findById(req.params.id);
+  const call = await CallLog.findOne({ _id: req.params.id, workspace: req.workspaceId });
   if (!call) throw ApiError.notFound('Call not found');
   if (req.user!.role === 'telecaller' && String(call.telecaller) !== req.user!.id) {
     throw ApiError.forbidden('This call is not yours');

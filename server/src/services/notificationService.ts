@@ -7,6 +7,8 @@ type CreateInput = {
   title: string;
   message?: string;
   link?: string;
+  // The workspace this notification belongs to (scopes the recipient's bell).
+  workspace?: string;
 };
 
 /** Fire-and-forget in-app notification creation. */
@@ -17,5 +19,6 @@ export async function notify(input: CreateInput) {
     title: input.title,
     message: input.message ?? '',
     link: input.link ?? '',
+    workspace: input.workspace,
   });
 }

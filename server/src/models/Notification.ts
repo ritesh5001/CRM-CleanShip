@@ -16,6 +16,7 @@ const notificationSchema = new Schema(
     message: { type: String, default: '' },
     link: { type: String, default: '' },
     isRead: { type: Boolean, default: false, index: true },
+    workspace: { type: Types.ObjectId, ref: 'Workspace', index: true },
   },
   { timestamps: true }
 );

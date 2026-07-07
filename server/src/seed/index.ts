@@ -2,11 +2,12 @@ import { connectDB, disconnectDB } from '../config/db.js';
 import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 import { Lead } from '../models/Lead.js';
+import { Workspace } from '../models/Workspace.js';
 
 async function seed() {
   await connectDB();
 
-  // 1. Superadmin (idempotent).
+  // 1. Superadmin (idempotent). The superadmin is global — no workspace.
   let admin = await User.findOne({ email: env.superadmin.email });
   if (!admin) {
     admin = new User({
@@ -22,7 +23,14 @@ async function seed() {
     console.log('ℹ️  Superadmin already exists, skipping.');
   }
 
-  // 2. A demo telecaller.
+  // 2. Default workspace (idempotent). All demo data lives inside it.
+  let workspace = await Workspace.findOne().sort({ createdAt: 1 });
+  if (!workspace) {
+    workspace = await Workspace.create({ name: 'Hull Cleaning', createdBy: admin._id });
+    console.log('✅ Default workspace created: Hull Cleaning');
+  }
+
+  // 3. A demo telecaller inside the default workspace.
   let tele = await User.findOne({ email: 'telecaller@cleanship.com' });
   if (!tele) {
     tele = new User({
@@ -31,6 +39,7 @@ async function seed() {
       phone: '9999999999',
       role: 'telecaller',
       dailyTarget: 50,
+      workspace: workspace._id,
       createdBy: admin._id,
     });
     await tele.setPassword('Tele@12345');
@@ -38,12 +47,12 @@ async function seed() {
     console.log('✅ Demo telecaller created: telecaller@cleanship.com / Tele@12345');
   }
 
-  // 3. A few sample leads (only if none exist).
+  // 4. A few sample leads in the default workspace (only if none exist).
   const leadCount = await Lead.countDocuments();
   if (leadCount === 0) {
     await Lead.insertMany([
-      { name: 'Ramesh Kumar', phone: '9876543210', city: 'Delhi', source: 'seed', createdBy: admin._id },
-      { name: 'Priya Sharma', phone: '9876500011', city: 'Mumbai', source: 'seed', createdBy: admin._id },
+      { name: 'Ramesh Kumar', phone: '9876543210', city: 'Delhi', source: 'seed', createdBy: admin._id, workspace: workspace._id },
+      { name: 'Priya Sharma', phone: '9876500011', city: 'Mumbai', source: 'seed', createdBy: admin._id, workspace: workspace._id },
       {
         name: 'Arjun Mehta',
         phone: '9811122233',
@@ -53,6 +62,7 @@ async function seed() {
         assignedTo: tele._id,
         assignedAt: new Date(),
         createdBy: admin._id,
+        workspace: workspace._id,
       },
     ]);
     console.log('✅ Sample leads created.');
