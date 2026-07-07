@@ -21,6 +21,9 @@ const notificationSchema = new Schema(
   { timestamps: true }
 );
 
+// Workspace-first compound index for the recipient's scoped bell + unread count.
+notificationSchema.index({ workspace: 1, recipient: 1, isRead: 1, createdAt: -1 });
+
 notificationSchema.set('toJSON', {
   virtuals: true,
   transform: (_doc, ret: Record<string, unknown>) => {

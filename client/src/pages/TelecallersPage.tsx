@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Field';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
 import { TelecallerFormModal } from '@/features/telecallers/TelecallerFormModal';
 import { fmtRelative } from '@/lib/format';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import type { User } from '@/types';
 
 export function TelecallersPage() {
@@ -20,7 +21,8 @@ export function TelecallersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
 
-  const { data, isLoading } = useTelecallers({ search });
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { data, isLoading } = useTelecallers({ search: debouncedSearch });
   const setStatus = useSetTelecallerStatus();
   const resetPw = useResetTelecallerPassword();
   const del = useDeleteTelecaller();

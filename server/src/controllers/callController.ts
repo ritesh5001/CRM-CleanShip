@@ -155,7 +155,8 @@ export const listCalls = asyncHandler(async (req: Request, res: Response) => {
       .populate('telecaller', 'name')
       .sort({ createdAt: -1 })
       .skip(pg.skip)
-      .limit(pg.limit),
+      .limit(pg.limit)
+      .lean(),
     CallLog.countDocuments(filter),
   ]);
 

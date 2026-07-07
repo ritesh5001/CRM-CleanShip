@@ -20,6 +20,7 @@ import { ContactsTable, ColumnsMenu, ShowNumbersToggle } from './ContactsTable';
 import { LeadFormModal } from '@/features/leads/LeadFormModal';
 import { ImportModal } from '@/features/leads/ImportModal';
 import { downloadLeadsCsv } from '@/lib/csv';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { LEAD_STATUS_LABELS } from '@/lib/constants';
 import type { LeadStatus } from '@/types';
 
@@ -80,6 +81,9 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
 
+  // The input stays instant; the network query only fires ~300ms after typing stops.
+  const debouncedSearch = useDebouncedValue(search, 300);
+
   // Persist filter/sort/paging changes so they survive a page refresh.
   useEffect(() => {
     setContactFilters(mode, { search, status, callStatus, assignedTo, qualifiedChip, sortBy, order, page, limit });
@@ -90,7 +94,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
 
   const query: LeadQuery = useMemo(
     () => ({
-      search,
+      search: debouncedSearch,
       status,
       callStatus,
       assignedTo: isAdmin ? assignedTo : undefined,
@@ -100,7 +104,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
       page,
       limit,
     }),
-    [search, status, callStatus, assignedTo, isAdmin, isContacts, qualifiedChip, sortBy, order, page, limit]
+    [debouncedSearch, status, callStatus, assignedTo, isAdmin, isContacts, qualifiedChip, sortBy, order, page, limit]
   );
 
   const { data, isLoading } = useLeads(query);

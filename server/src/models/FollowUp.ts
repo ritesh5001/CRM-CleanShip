@@ -15,6 +15,9 @@ const followUpSchema = new Schema(
   { timestamps: true }
 );
 
+// Workspace-first compound index for the scoped follow-up scope queries.
+followUpSchema.index({ workspace: 1, telecaller: 1, status: 1, scheduledAt: 1 });
+
 followUpSchema.set('toJSON', {
   virtuals: true,
   transform: (_doc, ret: Record<string, unknown>) => {

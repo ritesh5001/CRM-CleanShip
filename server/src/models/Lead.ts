@@ -102,6 +102,13 @@ const leadSchema = new Schema(
 
 leadSchema.index({ name: 'text', phone: 'text', email: 'text', company: 'text' });
 
+// Workspace-first compound indexes matching the list/stats query shapes so scoped
+// queries hit an index instead of scanning the whole (multi-workspace) collection.
+leadSchema.index({ workspace: 1, createdAt: -1 }); // default list + pagination count
+leadSchema.index({ workspace: 1, assignedTo: 1 }); // telecaller scope / admin assignee filter
+leadSchema.index({ workspace: 1, qualified: 1 }); // Leads tab
+leadSchema.index({ workspace: 1, callStatus: 1 }); // call-status chips
+
 leadSchema.set('toJSON', {
   virtuals: true,
   transform: (_doc, ret: Record<string, unknown>) => {

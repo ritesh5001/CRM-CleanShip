@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { patchListItem, removeListItem, restoreSnapshots } from '@/lib/queryPatch';
 import type { Paginated, Task, TaskStatus } from '@/types';
 
 export interface TaskQuery {
@@ -34,7 +35,21 @@ export function useUpdateTaskStatus() {
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) =>
       (await api.patch(`/tasks/${id}/status`, { status })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    // Reflect the new status instantly; reconcile with the server on settle.
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['tasks'] });
+      const snapshots = patchListItem<Task>(qc, ['tasks'], id, (t) => ({
+        ...t,
+        status,
+        completedAt: status === 'completed' ? new Date().toISOString() : undefined,
+      }));
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => restoreSnapshots(qc, ctx?.snapshots),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['my-stats'] });
+    },
   });
 }
 
@@ -42,6 +57,12 @@ export function useDeleteTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => (await api.delete(`/tasks/${id}`)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['tasks'] });
+      const snapshots = removeListItem<Task>(qc, ['tasks'], id);
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => restoreSnapshots(qc, ctx?.snapshots),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   });
 }

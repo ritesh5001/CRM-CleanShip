@@ -42,7 +42,8 @@ export const listFollowUps = asyncHandler(async (req: Request, res: Response) =>
       .populate('telecaller', 'name')
       .sort({ scheduledAt: 1 })
       .skip(pg.skip)
-      .limit(pg.limit),
+      .limit(pg.limit)
+      .lean(),
     FollowUp.countDocuments(filter),
   ]);
 

@@ -10,7 +10,7 @@ export const listNotifications = asyncHandler(async (req: Request, res: Response
   if (req.query.unread === 'true') filter.isRead = false;
 
   const [items, total, unreadCount] = await Promise.all([
-    Notification.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit),
+    Notification.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).lean(),
     Notification.countDocuments(filter),
     Notification.countDocuments({ recipient: req.user!.id, workspace: req.workspaceId, isRead: false }),
   ]);

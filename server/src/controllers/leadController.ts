@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { Lead, deriveCallStatus, deriveLeadStatus } from '../models/Lead.js';
@@ -70,7 +71,8 @@ export const listLeads = asyncHandler(async (req: Request, res: Response) => {
       .collation({ locale: 'en', strength: 2 }) // case-insensitive sort for name/company
       .sort(buildSort(req))
       .skip(pg.skip)
-      .limit(pg.limit),
+      .limit(pg.limit)
+      .lean(),
     Lead.countDocuments(filter),
   ]);
 
@@ -78,16 +80,43 @@ export const listLeads = asyncHandler(async (req: Request, res: Response) => {
 });
 
 // GET /leads/stats — counts for the clickable stat chips (scope minus callStatus).
+// One `$facet` aggregation computes every chip in a single round-trip. Aggregation
+// `$match` doesn't auto-cast ObjectIds (unlike find/count), so cast them here.
 export const getLeadStats = asyncHandler(async (req: Request, res: Response) => {
-  const base = buildFilter(req, false);
-  const [total, notCalled, done, notDone, leads] = await Promise.all([
-    Lead.countDocuments(base),
-    Lead.countDocuments({ ...base, callStatus: 'pending' }),
-    Lead.countDocuments({ ...base, callStatus: 'done' }),
-    Lead.countDocuments({ ...base, callStatus: 'not_done' }),
-    Lead.countDocuments({ ...base, qualified: true }),
+  const match: Record<string, unknown> = buildFilter(req, false);
+  if (typeof match.workspace === 'string') match.workspace = new Types.ObjectId(match.workspace);
+  if (typeof match.assignedTo === 'string') match.assignedTo = new Types.ObjectId(match.assignedTo);
+
+  const [row] = await Lead.aggregate<{
+    total: { n: number }[];
+    notCalled: { n: number }[];
+    done: { n: number }[];
+    notDone: { n: number }[];
+    leads: { n: number }[];
+  }>([
+    { $match: match },
+    {
+      $facet: {
+        total: [{ $count: 'n' }],
+        notCalled: [{ $match: { callStatus: 'pending' } }, { $count: 'n' }],
+        done: [{ $match: { callStatus: 'done' } }, { $count: 'n' }],
+        notDone: [{ $match: { callStatus: 'not_done' } }, { $count: 'n' }],
+        leads: [{ $match: { qualified: true } }, { $count: 'n' }],
+      },
+    },
   ]);
-  res.json({ success: true, stats: { total, notCalled, done, notDone, leads } });
+
+  const n = (a?: { n: number }[]) => a?.[0]?.n ?? 0;
+  res.json({
+    success: true,
+    stats: {
+      total: n(row?.total),
+      notCalled: n(row?.notCalled),
+      done: n(row?.done),
+      notDone: n(row?.notDone),
+      leads: n(row?.leads),
+    },
+  });
 });
 
 // GET /leads/export — all matching rows (capped) for client-side CSV.

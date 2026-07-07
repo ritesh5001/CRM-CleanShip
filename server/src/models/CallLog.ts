@@ -55,6 +55,10 @@ const callLogSchema = new Schema(
   { timestamps: true }
 );
 
+// Workspace-first compound indexes for Recents/history + per-contact call lists.
+callLogSchema.index({ workspace: 1, telecaller: 1, createdAt: -1 });
+callLogSchema.index({ workspace: 1, lead: 1 });
+
 callLogSchema.set('toJSON', {
   virtuals: true,
   transform: (_doc, ret: Record<string, unknown>) => {

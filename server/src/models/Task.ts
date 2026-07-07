@@ -21,6 +21,10 @@ const taskSchema = new Schema(
   { timestamps: true }
 );
 
+// Workspace-first compound indexes for the scoped task list/filter queries.
+taskSchema.index({ workspace: 1, assignedTo: 1, status: 1 });
+taskSchema.index({ workspace: 1, dueDate: 1 });
+
 taskSchema.set('toJSON', {
   virtuals: true,
   transform: (_doc, ret: Record<string, unknown>) => {

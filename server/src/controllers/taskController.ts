@@ -30,7 +30,8 @@ export const listTasks = asyncHandler(async (req: Request, res: Response) => {
       .populate('relatedLead', 'name phone')
       .sort({ dueDate: 1, createdAt: -1 })
       .skip(pg.skip)
-      .limit(pg.limit),
+      .limit(pg.limit)
+      .lean(),
     Task.countDocuments(filter),
   ]);
 

@@ -35,11 +35,44 @@ Two roles (`superadmin`, `telecaller`):
 Enforced by `authenticate` (JWT) + `requireRole(...)` middleware, plus per-document ownership checks
 in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 
+## Workspaces (multi-tenancy)
+
+The CRM is **multi-workspace**. A **Workspace** is a tenant boundary: each has its own telecallers,
+contacts, tasks, calls, follow-ups, notifications, and imports — completely separate from other
+workspaces. Every tenant-scoped model carries a required `workspace` ObjectId (see below).
+
+- The **superadmin is global** (no `workspace` field) and shared across all workspaces. They can
+  create, rename, switch between, and delete workspaces, and manage each workspace's telecallers/data.
+- A **telecaller belongs to exactly one workspace** (`User.workspace`, set at creation). Email is
+  globally unique, so each telecaller lives in one workspace only.
+- **Twilio/Integration is global (shared)** — one config for all workspaces; per-telecaller caller
+  IDs still work per workspace. The Twilio webhook flow is unchanged.
+
+**Active workspace resolution** (`middleware/workspace.ts` → `resolveWorkspace`, runs after
+`authenticate`, sets `req.workspaceId`): a telecaller is forced to their own `user.workspace` (any
+client header is ignored); the superadmin's active workspace comes from the **`X-Workspace-Id`**
+request header (validated; falls back to the earliest workspace). `requireWorkspace` guards data
+routes (400 when none resolved). Every data controller filters by `req.workspaceId` and stamps it on
+create; get/update/delete use `findOne({ _id, workspace })` so neither role can reach another
+workspace's document. The client sends `X-Workspace-Id` via the axios interceptor
+(`store/workspace.ts` holds the selection); switching clears the TanStack Query cache and refetches.
+Managed from `components/layout/WorkspaceSwitcher.tsx` (admin dropdown; telecaller sees a read-only badge).
+
+**Migrating pre-workspace data:** `npm run migrate:workspaces` creates a **"Hull Cleaning"** workspace
+(if none exists) and backfills `workspace` on all existing telecallers/contacts/tasks/calls/follow-ups
+(idempotent).
+
 ## Data models (`server/src/models`)
 
-- **User** — `name, email, phone, passwordHash, role, isActive, dailyTarget, twilioNumber, createdBy,
-  lastLoginAt`. `twilioNumber` is the Twilio caller ID the admin assigned this telecaller to dial
-  from (''=none). Methods: `setPassword`, `comparePassword` (bcrypt). `passwordHash` is `select:false`.
+Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBatch) has a required
+`workspace` ObjectId; the superadmin is the only workspace-less record.
+
+- **Workspace** — `name, isActive, createdBy`. Tenant boundary (see Workspaces above). Deleting one
+  cascades all its data; the last remaining workspace cannot be deleted.
+- **User** — `name, email, phone, passwordHash, role, isActive, dailyTarget, twilioNumber, workspace,
+  createdBy, lastLoginAt`. `twilioNumber` is the Twilio caller ID the admin assigned this telecaller
+  to dial from (''=none). `workspace` is set for telecallers, absent for the superadmin. Methods:
+  `setPassword`, `comparePassword` (bcrypt). `passwordHash` is `select:false`.
 - **Lead (= Contact)** — the collection stores **all contacts**; `qualified` marks the ones promoted
   to Leads. Fields: `name, phone, altPhone, email, title, company, city, state, country, source, tags,
   status, priority, qualified, callStatus(pending|done|not_done), lastOutcome, remarks[], assignedTo,
@@ -69,8 +102,11 @@ in controllers (telecaller queries are scoped to `assignedTo === req.user.id`).
 ## API surface (`/api/v1`)
 
 - **Auth:** `POST /auth/login`, `GET /auth/me`, `PUT /auth/change-password`, `POST /auth/logout`.
+- **Workspaces:** `GET /workspaces` (superadmin: all; telecaller: their own), and superadmin-only
+  `POST /workspaces`, `PUT /workspaces/:id` (rename), `DELETE /workspaces/:id` (cascade delete;
+  blocked on the last one). Not workspace-scoped — these manage the workspaces themselves.
 - **Users (superadmin):** `GET/POST /users`, `GET/PUT/DELETE /users/:id`,
-  `PATCH /users/:id/status|target|twilio-number|reset-password`.
+  `PATCH /users/:id/status|target|twilio-number|reset-password`. Scoped to the active workspace.
 - **Leads/Contacts:** `GET /leads` (use `?qualified=true` for the Leads view, `?callStatus=`, search,
   status filters), `POST /leads`, `GET/PUT/DELETE /leads/:id`, `POST /leads/import`,
   `PATCH /leads/bulk-assign`, `PATCH /leads/:id/assign`, `POST /leads/:id/remarks` (both roles add to
@@ -115,11 +151,19 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 - Lead import logic lives in `services/importService.ts` (xlsx + header normalization; handles CRM
   and Apollo.io export columns — first/last name, multiple phone columns, apostrophe-cleaning).
 - New resource = model → validators → controller → routes → register in `routes/index.ts`.
+- **Performance:** models carry workspace-first compound indexes matching the list/stats query
+  shapes; list reads use `.lean()`; `getLeadStats` computes all chip counts in one `$facet`
+  aggregation (cast ObjectId fields in aggregation `$match` — it doesn't auto-cast like find/count).
 
 ## Client conventions
 
-- Server state via **TanStack Query** hooks in `src/api/*` (one file per resource). Mutations
-  invalidate the relevant query keys.
+- Server state via **TanStack Query** hooks in `src/api/*` (one file per resource). Global query
+  defaults (`main.tsx`): `staleTime: 30s` (revisits render from cache), `placeholderData:
+  keepPreviousData` (lists never blank out on filter/page/search changes). Mutations are
+  **optimistic** — they patch the cache immediately and roll back on error, then invalidate on
+  settle. Reuse `lib/queryPatch.ts` (`patchListItem` / `removeListItem` / `restoreSnapshots`) for
+  list mutations; leads/calls have a specialized `patchLeadInLists` (`api/calls.ts`). Debounce
+  text-search inputs with `lib/useDebouncedValue.ts` before feeding them to a query.
 - Auth/token in **Zustand** (`store/auth.ts`, persisted to localStorage). Axios instance
   (`api/client.ts`) injects the bearer token and logs out on 401.
 - Routing in `routes/router.tsx`; guards `ProtectedRoute` / `RoleRoute` in `routes/guards.tsx`.
@@ -138,11 +182,12 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 ## Commands
 
 ```bash
-npm run install:all   # install all deps
-npm run seed          # seed superadmin + demo data
-npm run dev           # API (:5050) + client (:5173)
-npm run build         # build both
-npm run typecheck     # tsc --noEmit in both packages
+npm run install:all        # install all deps
+npm run seed               # seed superadmin + default workspace + demo data
+npm run migrate:workspaces # one-time: move pre-workspace data into "Hull Cleaning"
+npm run dev                # API (:5050) + client (:5173)
+npm run build              # build both
+npm run typecheck          # tsc --noEmit in both packages
 ```
 
 Seeded logins: `admin@cleanship.com / Admin@12345`, `telecaller@cleanship.com / Tele@12345`.
