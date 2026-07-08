@@ -236,7 +236,9 @@ export const useCallStore = create<CallState>((set, get) => ({
           pending: st.pending ? { ...st.pending, dialStatus: status, resultReason: reason ?? undefined } : st.pending,
           error: reason ?? st.error,
         }));
-        return;
+        // For a failed dial, the specific reason (from Twilio's error alert) lands a
+        // beat later — keep polling to upgrade the generic message until it arrives.
+        if (status !== 'failed' || result.dialReason) return;
       }
     }
   },

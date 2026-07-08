@@ -249,25 +249,12 @@ export const handleRecording = asyncHandler(async (req: Request, res: Response) 
 export const handleDialStatus = asyncHandler(async (req: Request, res: Response) => {
   const callSid = typeof req.body.CallSid === 'string' ? req.body.CallSid : '';
   const dialStatus = typeof req.body.DialCallStatus === 'string' ? req.body.DialCallStatus : undefined;
-  const dialCallSid = typeof req.body.DialCallSid === 'string' ? req.body.DialCallSid : '';
   const durationSec = req.body.DialCallDuration ? Number(req.body.DialCallDuration) : undefined;
 
   if (callSid && dialStatus) {
-    // On a `failed` dial, look up the child leg's Twilio error code to store a
-    // specific reason (invalid/unreachable number, blocked, geo-permission, …).
-    const failure =
-      dialStatus === 'failed' && dialCallSid ? await fetchDialFailureReason(dialCallSid) : {};
-
     await CallRecording.updateOne(
       { callSid },
-      {
-        $set: {
-          dialStatus,
-          ...(durationSec ? { durationSec } : {}),
-          ...(failure.errorCode ? { errorCode: failure.errorCode } : {}),
-          ...(failure.dialReason ? { dialReason: failure.dialReason } : {}),
-        },
-      },
+      { $set: { dialStatus, ...(durationSec ? { durationSec } : {}) } },
       { upsert: true }
     );
   }
@@ -275,8 +262,25 @@ export const handleDialStatus = asyncHandler(async (req: Request, res: Response)
 });
 
 // GET /calls/dial-status/:callSid — lets the client poll the dial result after hangup.
+// When the dial `failed` and we haven't resolved a specific reason yet, look it up
+// from Twilio's Debugger alerts (which appear a couple seconds after the failure)
+// and cache it — so a generic "failed" becomes e.g. "Invalid or unreachable number".
 export const getDialStatus = asyncHandler(async (req: Request, res: Response) => {
-  const rec = await CallRecording.findOne({ callSid: req.params.callSid });
+  const callSid = req.params.callSid;
+  const rec = await CallRecording.findOne({ callSid });
+
+  if (rec && rec.dialStatus === 'failed' && !rec.dialReason) {
+    const { errorCode, dialReason } = await fetchDialFailureReason(callSid);
+    if (dialReason) {
+      await CallRecording.updateOne(
+        { callSid },
+        { $set: { dialReason, ...(errorCode ? { errorCode } : {}) } }
+      );
+      rec.dialReason = dialReason;
+      if (errorCode) rec.errorCode = errorCode;
+    }
+  }
+
   res.json({
     success: true,
     dialStatus: rec?.dialStatus ?? null,

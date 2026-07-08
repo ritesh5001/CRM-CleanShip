@@ -102,19 +102,27 @@ export function reasonForErrorCode(code?: number | null): string {
 }
 
 /**
- * Fetches the error code of a (failed) dialled child call and maps it to a
- * human-readable reason. Best-effort — returns {} if Twilio can't be reached.
+ * Resolves *why* a call failed by reading Twilio's Debugger alerts, which carry
+ * the error code (e.g. 13224 "invalid number") attached to the call SID. Alerts
+ * land a few seconds after the failure, so this is meant to be retried (polled).
+ * Best-effort — returns {} if nothing is found or Twilio can't be reached.
  */
 export async function fetchDialFailureReason(
-  childCallSid: string
+  callSid: string
 ): Promise<{ errorCode?: number; dialReason?: string }> {
   const s = await getTwilioSettings();
-  if (!s || !s.accountSid || !s.authToken || !childCallSid) return {};
+  if (!s || !s.accountSid || !s.authToken || !callSid) return {};
   try {
     const client = twilio(s.accountSid, s.authToken);
-    const call = await client.calls(childCallSid).fetch();
-    const code = call.errorCode ?? undefined;
-    return { errorCode: code ?? undefined, dialReason: reasonForErrorCode(code) };
+    const alerts = await client.monitor.v1.alerts.list({
+      startDate: new Date(Date.now() - 15 * 60 * 1000),
+      limit: 100,
+    });
+    const alert = alerts.find((a) => a.resourceSid === callSid && a.errorCode);
+    if (!alert) return {};
+    const code = Number(alert.errorCode);
+    const errorCode = Number.isFinite(code) ? code : undefined;
+    return { errorCode, dialReason: reasonForErrorCode(errorCode) };
   } catch {
     return {};
   }
