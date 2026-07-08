@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Call, Device } from '@twilio/voice-sdk';
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { fetchVoiceToken, fetchDialStatus } from '@/api/calls';
+import { fetchVoiceToken, fetchDialStatus, type DialResult } from '@/api/calls';
 import { cleanPhone } from '@/lib/format';
 
 export type CallPhase = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended';
@@ -221,16 +221,19 @@ export const useCallStore = create<CallState>((set, get) => ({
     for (let i = 0; i < 6; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       if (get().pending?.twilioCallSid !== callSid) return; // a new call started
-      let status: string | null = null;
+      let result: DialResult | null = null;
       try {
-        status = await fetchDialStatus(callSid);
+        result = await fetchDialStatus(callSid);
       } catch {
         /* keep polling */
       }
-      if (status) {
-        const reason = dialStatusReason(status);
+      if (result?.dialStatus) {
+        const status = result.dialStatus;
+        // Prefer the server's specific reason (derived from the Twilio error code,
+        // e.g. "Invalid or unreachable number"); fall back to the generic status message.
+        const reason = result.dialReason ?? dialStatusReason(status);
         set((st) => ({
-          pending: st.pending ? { ...st.pending, dialStatus: status!, resultReason: reason ?? undefined } : st.pending,
+          pending: st.pending ? { ...st.pending, dialStatus: status, resultReason: reason ?? undefined } : st.pending,
           error: reason ?? st.error,
         }));
         return;

@@ -14,6 +14,7 @@ import {
   resolveCallerId,
   fetchRecordingMedia,
   getTwilioSettings,
+  fetchDialFailureReason,
 } from '../services/twilioService.js';
 
 /** Normalizes a phone to a dial-able form, keeping a single leading '+'. */
@@ -248,12 +249,25 @@ export const handleRecording = asyncHandler(async (req: Request, res: Response) 
 export const handleDialStatus = asyncHandler(async (req: Request, res: Response) => {
   const callSid = typeof req.body.CallSid === 'string' ? req.body.CallSid : '';
   const dialStatus = typeof req.body.DialCallStatus === 'string' ? req.body.DialCallStatus : undefined;
+  const dialCallSid = typeof req.body.DialCallSid === 'string' ? req.body.DialCallSid : '';
   const durationSec = req.body.DialCallDuration ? Number(req.body.DialCallDuration) : undefined;
 
   if (callSid && dialStatus) {
+    // On a `failed` dial, look up the child leg's Twilio error code to store a
+    // specific reason (invalid/unreachable number, blocked, geo-permission, …).
+    const failure =
+      dialStatus === 'failed' && dialCallSid ? await fetchDialFailureReason(dialCallSid) : {};
+
     await CallRecording.updateOne(
       { callSid },
-      { $set: { dialStatus, ...(durationSec ? { durationSec } : {}) } },
+      {
+        $set: {
+          dialStatus,
+          ...(durationSec ? { durationSec } : {}),
+          ...(failure.errorCode ? { errorCode: failure.errorCode } : {}),
+          ...(failure.dialReason ? { dialReason: failure.dialReason } : {}),
+        },
+      },
       { upsert: true }
     );
   }
@@ -263,7 +277,12 @@ export const handleDialStatus = asyncHandler(async (req: Request, res: Response)
 // GET /calls/dial-status/:callSid — lets the client poll the dial result after hangup.
 export const getDialStatus = asyncHandler(async (req: Request, res: Response) => {
   const rec = await CallRecording.findOne({ callSid: req.params.callSid });
-  res.json({ success: true, dialStatus: rec?.dialStatus ?? null });
+  res.json({
+    success: true,
+    dialStatus: rec?.dialStatus ?? null,
+    dialReason: rec?.dialReason ?? null,
+    errorCode: rec?.errorCode ?? null,
+  });
 });
 
 // POST /calls/status — optional call status callback; stores authoritative

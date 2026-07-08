@@ -79,6 +79,47 @@ export async function fetchRecordingMedia(
   return { buffer, contentType: resp.headers.get('content-type') || 'audio/mpeg' };
 }
 
+// Maps common Twilio call error codes (set on a failed dial) to a clear reason a
+// telecaller can act on. See https://www.twilio.com/docs/api/errors.
+const DIAL_ERROR_REASONS: Record<number, string> = {
+  13214: 'Invalid caller ID — the number this call dials from is not valid.',
+  13223: 'This number cannot be dialled from your account.',
+  13224: 'Invalid or unreachable number — the number does not exist or cannot be reached. Check and update it.',
+  13225: 'This number is blocked from being dialled.',
+  13226: 'Invalid number — calling this number is not allowed.',
+  13227: 'Calling this country is not enabled on the account (geo permissions).',
+  21211: 'Invalid number — the number is not a valid phone number.',
+  21214: 'This number could not be called (invalid or unreachable).',
+  21215: 'Calling this country is not enabled on the account (geo permissions).',
+  21401: 'Invalid number — not a valid phone number.',
+  21601: 'This number is not a valid, callable phone number.',
+};
+
+/** Human reason for a Twilio call error code (falls back to a generic message). */
+export function reasonForErrorCode(code?: number | null): string {
+  if (code && DIAL_ERROR_REASONS[code]) return DIAL_ERROR_REASONS[code];
+  return 'Call failed — the number may be wrong or unreachable. Try updating it.';
+}
+
+/**
+ * Fetches the error code of a (failed) dialled child call and maps it to a
+ * human-readable reason. Best-effort — returns {} if Twilio can't be reached.
+ */
+export async function fetchDialFailureReason(
+  childCallSid: string
+): Promise<{ errorCode?: number; dialReason?: string }> {
+  const s = await getTwilioSettings();
+  if (!s || !s.accountSid || !s.authToken || !childCallSid) return {};
+  try {
+    const client = twilio(s.accountSid, s.authToken);
+    const call = await client.calls(childCallSid).fetch();
+    const code = call.errorCode ?? undefined;
+    return { errorCode: code ?? undefined, dialReason: reasonForErrorCode(code) };
+  } catch {
+    return {};
+  }
+}
+
 /** Lists the account's voice-capable phone numbers (for the admin assignment UI). */
 export async function listNumbers(): Promise<{ phoneNumber: string; friendlyName: string }[]> {
   const s = await getTwilioSettings();

@@ -12,6 +12,10 @@ const callRecordingSchema = new Schema(
     status: { type: String },
     // Result of dialing the lead: completed | busy | no-answer | failed | canceled.
     dialStatus: { type: String },
+    // When a dial fails, the Twilio error code on the child leg (e.g. 13224) and a
+    // human-readable reason derived from it — so the UI can show *why* it failed.
+    errorCode: { type: Number },
+    dialReason: { type: String },
   },
   { timestamps: true }
 );
