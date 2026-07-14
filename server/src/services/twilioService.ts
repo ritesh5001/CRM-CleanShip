@@ -70,13 +70,28 @@ export async function fetchRecordingMedia(
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const s = await getTwilioSettings();
   if (!s || !s.accountSid || !s.authToken) return null;
-  // The recording resource URL serves media when suffixed with .mp3 (or .wav).
-  const mediaUrl = /\.(mp3|wav)$/i.test(recordingUrl) ? recordingUrl : `${recordingUrl}.mp3`;
   const auth = Buffer.from(`${s.accountSid}:${s.authToken}`).toString('base64');
-  const resp = await fetch(mediaUrl, { headers: { Authorization: `Basic ${auth}` } });
-  if (!resp.ok) return null;
-  const buffer = Buffer.from(await resp.arrayBuffer());
-  return { buffer, contentType: resp.headers.get('content-type') || 'audio/mpeg' };
+
+  const baseUrl = recordingUrl.replace(/\.(mp3|wav)$/i, '');
+  const candidates = [
+    { ext: '.mp3', requestedChannels: '2' },
+    { ext: '.wav', requestedChannels: '2' },
+    { ext: '.mp3', requestedChannels: '1' },
+    { ext: '.wav', requestedChannels: '1' },
+  ];
+
+  for (const { ext, requestedChannels } of candidates) {
+    const mediaUrl = new URL(`${baseUrl}${ext}`);
+    mediaUrl.searchParams.set('RequestedChannels', requestedChannels);
+
+    const resp = await fetch(mediaUrl, { headers: { Authorization: `Basic ${auth}` } });
+    if (!resp.ok) continue;
+
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    return { buffer, contentType: resp.headers.get('content-type') || (ext === '.wav' ? 'audio/x-wav' : 'audio/mpeg') };
+  }
+
+  return null;
 }
 
 // Maps common Twilio call error codes (set on a failed dial) to a clear reason a
