@@ -101,3 +101,6 @@ export const PHONE_LEAD_OUTCOME_COLORS: Record<PhoneLeadOutcome, string> = {
   interested: 'bg-emerald-100 text-emerald-700',
   not_interested: 'bg-rose-100 text-rose-700',
 };
+
+/** Shown when Twilio calling is set up but the admin hasn't assigned this user a number. */
+export const NO_CALLER_ID_MESSAGE = 'No calling number is assigned to you. Ask an admin to assign one.';

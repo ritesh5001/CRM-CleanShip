@@ -6,6 +6,7 @@ import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
+import { NO_CALLER_ID_MESSAGE } from '@/lib/constants';
 import { fmtDateTime, isOverdue, telLink, whatsappLink } from '@/lib/format';
 import { formatPhoneDisplay, toE164 } from '@/lib/phone';
 import { apiError } from '@/api/client';
@@ -24,6 +25,7 @@ export function FollowUpsPage() {
   const markDone = useMarkFollowUpDone();
   const callConfig = useCallConfig().data;
   const callingEnabled = callConfig?.enabled ?? false;
+  const needsCallerId = (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
   const startCall = useCallStore((s) => s.startCall);
   const callPhase = useCallStore((s) => s.phase);
   const callBusy = callPhase === 'connecting' || callPhase === 'ringing' || callPhase === 'in_call';
@@ -95,6 +97,15 @@ export function FollowUpsPage() {
                                 phone: toE164(lead.phone, lead.country, callConfig?.defaultCountryCode),
                               })
                             }
+                          >
+                            <Phone size={14} /> Call
+                          </Button>
+                        ) : needsCallerId ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            title={NO_CALLER_ID_MESSAGE}
+                            onClick={() => toast.error(NO_CALLER_ID_MESSAGE)}
                           >
                             <Phone size={14} /> Call
                           </Button>

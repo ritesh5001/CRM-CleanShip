@@ -184,11 +184,21 @@ export const streamRecording = asyncHandler(async (req: Request, res: Response) 
 
 // GET /calls/config — tells the client whether in-app (Twilio) calling is
 // available *for this user*. A telecaller needs a Twilio number assigned by the
-// admin; a superadmin falls back to the default caller ID.
+// admin; a superadmin falls back to the default caller ID. `configured` and
+// `hasCallerId` are reported separately so the client can distinguish "Twilio
+// isn't set up at all" (tel: fallback) from "you have no number" (fixable by an
+// admin) instead of silently degrading to a tel: link.
 export const getCallConfig = asyncHandler(async (req: Request, res: Response) => {
-  const enabled = (await twilioEnabled()) && Boolean(await resolveCallerId(req.user!.id));
+  const configured = await twilioEnabled();
+  const hasCallerId = configured && Boolean(await resolveCallerId(req.user!.id));
   const settings = await getTwilioSettings();
-  res.json({ success: true, enabled, defaultCountryCode: settings?.defaultCountryCode ?? '' });
+  res.json({
+    success: true,
+    enabled: configured && hasCallerId,
+    configured,
+    hasCallerId,
+    defaultCountryCode: settings?.defaultCountryCode ?? '',
+  });
 });
 
 // GET /calls/token — mints a short-lived Twilio Voice access token for the

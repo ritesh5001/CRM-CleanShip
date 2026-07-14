@@ -13,14 +13,22 @@ export function useCalls(params: { lead?: string; telecaller?: string; page?: nu
   });
 }
 
+export interface CallConfig {
+  /** Twilio is set up AND this user has a caller ID — the softphone can dial. */
+  enabled: boolean;
+  /** Twilio is switched on and fully credentialed (account-wide). */
+  configured: boolean;
+  /** This user has a Twilio number to dial from (admin-assigned). */
+  hasCallerId: boolean;
+  defaultCountryCode?: string;
+}
+
 /** Whether in-app (Twilio) calling is configured on the server (+ default country code). */
 export function useCallConfig() {
   return useQuery({
     queryKey: ['call-config'],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; enabled: boolean; defaultCountryCode?: string }>(
-        '/calls/config'
-      );
+      const { data } = await api.get<{ success: boolean } & CallConfig>('/calls/config');
       return data;
     },
     staleTime: 5 * 60 * 1000,

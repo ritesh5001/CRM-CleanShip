@@ -30,6 +30,7 @@ import { CallHistory } from '@/features/calls/CallHistory';
 import {
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
+  NO_CALLER_ID_MESSAGE,
   PHONE_CALL_STATUS_COLORS,
   PHONE_CALL_STATUS_LABELS,
   PHONE_LEAD_OUTCOME_COLORS,
@@ -128,12 +129,16 @@ function FollowUpCell({ lead }: { lead: Lead }) {
 
 /** Copy (left) · Call · WhatsApp actions for a phone number.
  *  When Twilio calling is enabled and a `lead` is provided, Call dials in-app
- *  (browser softphone); otherwise it falls back to a `tel:` link. */
+ *  (browser softphone). If Twilio is set up but this user has no caller ID, Call
+ *  explains that rather than opening a `tel:` link (which just makes the OS ask
+ *  which app to dial with). Only when Twilio isn't set up at all do we fall back
+ *  to `tel:`. */
 function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; lead?: Lead; slot?: PhoneSlot; big?: boolean }) {
   const size = big ? 16 : 15;
   const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
   const callConfig = useCallConfig().data;
   const callingEnabled = callConfig?.enabled ?? false;
+  const needsCallerId = (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
   const startCall = useCallStore((s) => s.startCall);
   const phase = useCallStore((s) => s.phase);
   const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
@@ -210,6 +215,10 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
           title={busy ? 'A call is in progress' : `Call ${phone}`}
           className={`${callCls} disabled:opacity-40`}
         >
+          <Phone size={size} />
+        </button>
+      ) : needsCallerId ? (
+        <button onClick={() => toast.error(NO_CALLER_ID_MESSAGE)} title={NO_CALLER_ID_MESSAGE} className={callCls}>
           <Phone size={size} />
         </button>
       ) : (
