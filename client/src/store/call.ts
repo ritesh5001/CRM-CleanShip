@@ -3,6 +3,37 @@ import { Call, Device } from '@twilio/voice-sdk';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import { fetchVoiceToken, fetchDialStatus, type DialResult } from '@/api/calls';
 import { cleanPhone } from '@/lib/format';
+import { useAudioStore } from '@/store/audio';
+
+/**
+ * Point the Twilio Device at the mic/speaker chosen on the Device Test page.
+ * Best-effort: a remembered device can be unplugged, and speaker selection is
+ * Chromium-only — either way we fall back to the OS default rather than fail
+ * the call.
+ */
+async function applyAudioDevices(device: Device) {
+  // Only the labels persist across a reload, so re-resolve the live deviceIds
+  // before dialling — otherwise a saved mic silently reverts to the default for
+  // anyone who hasn't opened the Device Test page this session.
+  const audio = useAudioStore.getState();
+  if ((audio.inputLabel || audio.outputLabel) && !audio.inputDeviceId && !audio.outputDeviceId) {
+    await audio.refreshDevices();
+  }
+  const { inputDeviceId, outputDeviceId } = useAudioStore.getState();
+  try {
+    if (inputDeviceId) await device.audio?.setInputDevice(inputDeviceId);
+    else await device.audio?.unsetInputDevice();
+  } catch {
+    /* fall back to the default mic */
+  }
+  try {
+    if (outputDeviceId && device.audio?.isOutputSelectionSupported) {
+      await device.audio.speakerDevices.set(outputDeviceId);
+    }
+  } catch {
+    /* fall back to the default speaker */
+  }
+}
 
 export type CallPhase = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended';
 export type PhoneSlot = 'phone1' | 'phone2' | 'phone3';
@@ -123,6 +154,7 @@ export const useCallStore = create<CallState>((set, get) => ({
           /* a failed refresh surfaces on the next call attempt */
         }
       });
+      await applyAudioDevices(dev);
       set({ device: dev, ready: true, initializing: false });
     } catch (e) {
       set({
@@ -150,6 +182,8 @@ export const useCallStore = create<CallState>((set, get) => ({
       set({ error: 'Calling is unavailable' });
       return;
     }
+    // Honour a mic/speaker change made since the Device was created.
+    await applyAudioDevices(device);
     set({
       phase: 'connecting',
       leadId,

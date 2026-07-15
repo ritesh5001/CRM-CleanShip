@@ -10,6 +10,7 @@ import { TasksPage } from '@/pages/TasksPage';
 import { FollowUpsPage } from '@/pages/FollowUpsPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { RecentsPage } from '@/pages/RecentsPage';
+import { DeviceTestPage } from '@/pages/DeviceTestPage';
 
 export function AppRoutes() {
   return (
@@ -36,6 +37,7 @@ export function AppRoutes() {
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/followups" element={<FollowUpsPage />} />
         <Route path="/recents" element={<RecentsPage />} />
+        <Route path="/device-test" element={<DeviceTestPage />} />
         <Route
           path="/integrations"
           element={
