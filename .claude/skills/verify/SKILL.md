@@ -71,3 +71,12 @@ That yields "Fake Audio Input 1/2" devices and a signal that moves a level meter
   *after* a grant — don't let it clobber the newer state.
 - Twilio calling is configured per-workspace in the DB, not env. A telecaller with
   no `twilioNumber` correctly shows "Not set up" on the Device Test page.
+- **Vite does not always pick up edits mid-session.** If a driver script sees stale
+  behaviour, check `curl -s http://localhost:5173/src/<file> | grep <new-symbol>`
+  before debugging the code — restart `npm run dev` if it's missing.
+- The real Twilio media path can't connect from a test env. To drive call UI
+  (CallBar, DTMF, disposition modal), set state directly on the dev-only store:
+  `window.callStore.setState({ phase: 'in_call', call: stubCall, ... })` with a
+  stub exposing `sendDigits`/`mute`/`disconnect`/`on`.
+- `defaultCountryCode` is empty on this install, so local numbers without a `+`
+  won't validate in the dialer — use full E.164 (`+1415…`) when driving it.

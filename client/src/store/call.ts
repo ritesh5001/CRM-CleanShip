@@ -40,7 +40,8 @@ export type PhoneSlot = 'phone1' | 'phone2' | 'phone3';
 
 /** Summary of a just-ended call, used to seed the disposition modal. */
 export interface PendingDisposition {
-  leadId: string;
+  /** Null for a custom dial to a number that isn't a saved contact. */
+  leadId: string | null;
   leadName: string;
   phone: string; // the actual number that was dialled
   phoneSlot: PhoneSlot; // which of the contact's numbers (phone1/2/3)
@@ -109,10 +110,19 @@ interface CallState {
   muted: boolean;
   error: string | null;
   pending: PendingDisposition | null;
+  /** DTMF digits sent during this call, e.g. "1" then "3" → "13". For the UI. */
+  digitsSent: string;
 
   /** Lazily create the Twilio Device (idempotent). Safe to call repeatedly. */
   initDevice: () => Promise<void>;
-  startCall: (lead: { leadId: string; name: string; phone: string; phoneSlot?: PhoneSlot }) => Promise<void>;
+  startCall: (lead: {
+    leadId: string | null;
+    name: string;
+    phone: string;
+    phoneSlot?: PhoneSlot;
+  }) => Promise<void>;
+  /** Send a DTMF tone (IVR menus: "press 1 for sales"). Only valid mid-call. */
+  sendDigit: (digit: string) => void;
   toggleMute: () => void;
   hangup: () => void;
   clearPending: () => void;
@@ -134,6 +144,7 @@ export const useCallStore = create<CallState>((set, get) => ({
   muted: false,
   error: null,
   pending: null,
+  digitsSent: '',
 
   initDevice: async () => {
     const { device, initializing } = get();
@@ -194,11 +205,12 @@ export const useCallStore = create<CallState>((set, get) => ({
       startedAt: null,
       error: null,
       pending: null,
+      digitsSent: '',
     });
 
     let callSid: string | undefined;
     try {
-      const call = await device.connect({ params: { To: to, leadId } });
+      const call = await device.connect({ params: { To: to, ...(leadId ? { leadId } : {}) } });
 
       call.on('ringing', () => set({ phase: 'ringing' }));
       call.on('accept', (c: Call) => {
@@ -213,9 +225,8 @@ export const useCallStore = create<CallState>((set, get) => ({
           call: null,
           startedAt: null,
           muted: false,
-          pending: lid
-            ? { leadId: lid, leadName: lname, phone: ph, phoneSlot: slot, durationSec, twilioCallSid: callSid }
-            : null,
+          // A custom dial has no leadId but still needs its outcome captured.
+          pending: { leadId: lid, leadName: lname, phone: ph, phoneSlot: slot, durationSec, twilioCallSid: callSid },
         });
         // The call never connected (no talk time) → find out why from Twilio's dial result.
         if (callSid && durationSec === 0) void get().pollDialStatus(callSid);
@@ -235,6 +246,16 @@ export const useCallStore = create<CallState>((set, get) => ({
         error: e instanceof Error ? e.message : 'Could not place the call',
       });
     }
+  },
+
+  // Twilio only transmits DTMF on a connected call — pressing a key while it's
+  // still ringing would be silently dropped, so ignore it rather than pretend.
+  sendDigit: (digit) => {
+    const { call, phase } = get();
+    if (!call || phase !== 'in_call') return;
+    if (!/^[0-9*#]$/.test(digit)) return;
+    call.sendDigits(digit);
+    set((s) => ({ digitsSent: s.digitsSent + digit }));
   },
 
   toggleMute: () => {
@@ -277,7 +298,8 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
 
-  clearPending: () => set({ pending: null, phase: 'idle', leadId: null, leadName: '', phone: '', error: null }),
+  clearPending: () =>
+    set({ pending: null, phase: 'idle', leadId: null, leadName: '', phone: '', error: null, digitsSent: '' }),
 
   destroy: () => {
     const { device, call } = get();
@@ -286,3 +308,10 @@ export const useCallStore = create<CallState>((set, get) => ({
     set({ device: null, ready: false, call: null, phase: 'idle', pending: null });
   },
 }));
+
+// Softphone state is only reachable mid-call, which makes it awkward to inspect
+// when something goes wrong. Expose the store in dev builds so it can be read and
+// driven from the browser console. Stripped from production bundles.
+if (import.meta.env.DEV) {
+  (window as unknown as { callStore?: typeof useCallStore }).callStore = useCallStore;
+}

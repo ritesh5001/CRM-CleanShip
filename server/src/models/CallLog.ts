@@ -35,7 +35,9 @@ export const DISPOSITION_TO_LEAD_STATUS: Record<Disposition, string> = {
 
 const callLogSchema = new Schema(
   {
-    lead: { type: Types.ObjectId, ref: 'Lead', required: true, index: true },
+    // Optional: a custom call to a number that was never saved as a contact has
+    // no Lead to attach to, but the call + its outcome must still be recorded.
+    lead: { type: Types.ObjectId, ref: 'Lead', index: true },
     telecaller: { type: Types.ObjectId, ref: 'User', required: true, index: true },
     // Optional: a "not connected" attempt or a plain call-status mark has no disposition.
     disposition: { type: String, enum: DISPOSITIONS },

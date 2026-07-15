@@ -3,7 +3,7 @@ import * as ctrl from '../controllers/callController.js';
 import { authenticate } from '../middleware/auth.js';
 import { resolveWorkspace, requireWorkspace } from '../middleware/workspace.js';
 import { validate } from '../middleware/validate.js';
-import { logCallSchema } from '../validators/callValidators.js';
+import { logCallSchema, saveCustomContactSchema } from '../validators/callValidators.js';
 import { isEnabled, validateSignature } from '../services/twilioService.js';
 import { ApiError } from '../utils/ApiError.js';
 
@@ -36,5 +36,6 @@ router.get('/dial-status/:callSid', ctrl.getDialStatus);
 router.get('/:id/recording', ctrl.streamRecording);
 router.get('/', ctrl.listCalls);
 router.post('/', validate(logCallSchema), ctrl.logCall);
+router.post('/save-contact', validate(saveCustomContactSchema), ctrl.saveCustomContact);
 
 export default router;

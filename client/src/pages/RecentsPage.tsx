@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PhoneCall } from 'lucide-react';
+import { PhoneCall, Phone } from 'lucide-react';
 import { useCalls } from '@/api/calls';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
@@ -71,14 +71,16 @@ export function RecentsPage() {
               return (
                 <div key={c._id} className="flex flex-wrap items-center gap-3 p-4">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
-                    {(lead?.name?.[0] ?? '?').toUpperCase()}
+                    {lead?.name ? lead.name[0].toUpperCase() : <Phone size={15} />}
                   </span>
                   <div className="min-w-0 flex-1">
+                    {/* A custom dial has no contact — lead with the number itself
+                        rather than an anonymous "unknown". */}
                     <p className="truncate font-medium text-slate-800 dark:text-slate-100">
-                      {lead?.name ?? 'Unknown contact'}
+                      {lead?.name ?? number ?? 'Unknown contact'}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {number}
+                      {lead ? number : 'Not saved as a contact'}
                       {isAdmin && telecallerName(c) ? ` · by ${telecallerName(c)}` : ''}
                     </p>
                   </div>

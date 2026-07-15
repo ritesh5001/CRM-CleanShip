@@ -6,7 +6,7 @@ import { CallRecording } from '../models/CallRecording.js';
 import { Lead } from '../models/Lead.js';
 import { FollowUp } from '../models/FollowUp.js';
 import { getPagination, paginated } from '../utils/pagination.js';
-import type { LogCallInput } from '../validators/callValidators.js';
+import type { LogCallInput, SaveCustomContactInput } from '../validators/callValidators.js';
 import {
   buildDialTwiml,
   generateVoiceToken,
@@ -46,25 +46,25 @@ const DISPOSITION_TO_PHONE_OUTCOME: Record<
 // callStatus 'not_done' → records the attempt only (no CallLog, no outcome).
 export const logCall = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as LogCallInput;
-  const lead = await Lead.findOne({ _id: body.lead, workspace: req.workspaceId });
-  if (!lead) throw ApiError.notFound('Contact not found');
+
+  // A custom dial to a number that isn't saved has no contact — log the call on
+  // its own so the outcome is never lost, and let the caller save it afterwards.
+  const lead = body.lead ? await Lead.findOne({ _id: body.lead, workspace: req.workspaceId }) : null;
+  if (body.lead && !lead) throw ApiError.notFound('Contact not found');
 
   // Telecallers may only update contacts assigned to them.
-  if (req.user!.role === 'telecaller' && String(lead.assignedTo) !== req.user!.id) {
+  if (lead && req.user!.role === 'telecaller' && String(lead.assignedTo) !== req.user!.id) {
     throw ApiError.forbidden('This contact is not assigned to you');
   }
 
   let followUp = null;
   const isDone = body.callStatus === 'done';
   const disposition = isDone ? (body.disposition as Disposition) : undefined;
-  const slot =
-    body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
-  const s = slot as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
 
   // Always log the call — connected (with a disposition) OR a not-connected attempt —
   // so every call shows up in Recents / call history.
   const callLog = await CallLog.create({
-    lead: lead._id,
+    lead: lead?._id,
     telecaller: req.user!.id,
     disposition,
     callStatus: isDone ? DISPOSITION_TO_PHONE_OUTCOME[disposition!].callStatus : 'not_connected',
@@ -86,6 +86,16 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
       await callLog.save();
     }
   }
+
+  // Nothing further to update for a contact-less custom call.
+  if (!lead) {
+    res.status(201).json({ success: true, callLog, followUp: null, lead: null });
+    return;
+  }
+
+  const slot =
+    body.phone === 'phone2' ? lead.phone2Outcome : body.phone === 'phone3' ? lead.phone3Outcome : lead.phone1Outcome;
+  const s = slot as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
 
   s.lastCalledAt = new Date();
 
@@ -136,6 +146,75 @@ export const logCall = asyncHandler(async (req: Request, res: Response) => {
   await lead.save();
 
   res.status(201).json({ success: true, callLog, followUp, lead });
+});
+
+// POST /calls/save-contact — promotes a custom-dialled number into a real contact
+// and back-links the CallLog that was already recorded for it, so the call and its
+// outcome move onto the new contact's history instead of staying orphaned.
+export const saveCustomContact = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as SaveCustomContactInput;
+  const callLog = await CallLog.findOne({ _id: body.callLog, workspace: req.workspaceId });
+  if (!callLog) throw ApiError.notFound('Call not found');
+  if (req.user!.role === 'telecaller' && String(callLog.telecaller) !== req.user!.id) {
+    throw ApiError.forbidden('This call is not yours');
+  }
+  if (callLog.lead) throw ApiError.badRequest('This call already belongs to a contact');
+
+  const phone = cleanPhone(body.phone);
+  // The same number may already exist in this workspace — adopt it rather than
+  // creating a duplicate.
+  let lead = await Lead.findOne({ phone, workspace: req.workspaceId });
+  if (!lead) {
+    lead = await Lead.create({
+      name: body.name,
+      phone,
+      email: body.email || '',
+      company: body.company,
+      city: body.city,
+      notes: body.notes,
+      source: 'custom_call',
+      // A telecaller saving their own call keeps it; an admin leaves it unassigned.
+      assignedTo: req.user!.role === 'telecaller' ? req.user!.id : undefined,
+      assignedAt: req.user!.role === 'telecaller' ? new Date() : undefined,
+      status: req.user!.role === 'telecaller' ? 'assigned' : 'new',
+      createdBy: req.user!.id,
+      workspace: req.workspaceId,
+    });
+  }
+
+  // Re-apply the call's outcome to the contact now that one exists.
+  callLog.set('lead', lead._id);
+  await callLog.save();
+
+  const disposition = callLog.disposition as Disposition | undefined;
+  if (disposition) {
+    lead.status = DISPOSITION_TO_LEAD_STATUS[disposition] as typeof lead.status;
+    lead.callStatus = 'done';
+    lead.lastOutcome = disposition;
+    if (disposition === 'interested' || disposition === 'converted') lead.qualified = true;
+    const mapped = DISPOSITION_TO_PHONE_OUTCOME[disposition];
+    const s = lead.phone1Outcome as { callStatus: string; leadOutcome: string; lastCalledAt?: Date };
+    s.callStatus = mapped.callStatus;
+    if (mapped.leadOutcome !== 'none') s.leadOutcome = mapped.leadOutcome;
+    s.lastCalledAt = callLog.createdAt ?? new Date();
+  } else {
+    lead.callStatus = 'not_done';
+  }
+  lead.lastContactedAt = callLog.createdAt ?? new Date();
+
+  if (callLog.notes) {
+    lead.remarks.push({
+      text: callLog.notes,
+      by: req.user!.id,
+      byName: req.user!.name,
+      byRole: req.user!.role,
+      phone: 'phone1',
+      createdAt: new Date(),
+    });
+  }
+  await lead.save();
+
+  res.status(201).json({ success: true, lead, callLog });
 });
 
 // GET /calls?lead=  — call history; telecallers scoped to their own logs.

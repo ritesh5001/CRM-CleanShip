@@ -73,7 +73,8 @@ const DISPOSITION_TO_LEAD_STATUS: Record<Disposition, Lead['status']> = {
 };
 
 interface LogCallVars {
-  lead: string;
+  /** Omitted for a custom dial to a number that isn't a saved contact. */
+  lead?: string;
   callStatus: CallStatus;
   disposition?: Disposition;
   notes?: string;
@@ -99,6 +100,30 @@ export function patchLeadInLists(
   return snapshots;
 }
 
+export interface SaveCustomContactVars {
+  callLog: string;
+  name: string;
+  phone: string;
+  email?: string;
+  company?: string;
+  city?: string;
+  notes?: string;
+}
+
+/** Turns a custom-dialled number into a contact, back-linking the call already logged. */
+export function useSaveCustomContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: SaveCustomContactVars) =>
+      (await api.post<{ success: boolean; lead: Lead }>('/calls/save-contact', payload)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+      qc.invalidateQueries({ queryKey: ['calls'] });
+    },
+  });
+}
+
 export function useLogCall() {
   const qc = useQueryClient();
   const user = useAuthStore.getState().user;
@@ -106,6 +131,8 @@ export function useLogCall() {
   return useMutation({
     mutationFn: async (payload: LogCallVars) => (await api.post('/calls', payload)).data,
     onMutate: async (vars) => {
+      // A custom call has no contact row to patch — nothing to do optimistically.
+      if (!vars.lead) return { snapshots: undefined };
       await qc.cancelQueries({ queryKey: ['leads'] });
       const snapshots = patchLeadInLists(qc, vars.lead, (l) => {
         const next: Lead = { ...l };

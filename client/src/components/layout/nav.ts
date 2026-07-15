@@ -8,6 +8,7 @@ import {
   PhoneCall,
   Plug,
   Mic,
+  Phone,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/types';
@@ -25,6 +26,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
+    { to: '/dialer', label: 'Dialer', icon: Phone },
     { to: '/recents', label: 'Recents', icon: PhoneCall },
     { to: '/device-test', label: 'Device Test', icon: Mic },
     { to: '/integrations', label: 'Integrations', icon: Plug },
@@ -34,6 +36,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/contacts', label: 'Contacts', icon: Contact },
     { to: '/leads', label: 'Leads', icon: Star },
     { to: '/tasks', label: 'Tasks', icon: ListChecks },
+    { to: '/dialer', label: 'Dialer', icon: Phone },
     { to: '/recents', label: 'Recents', icon: PhoneCall },
     { to: '/followups', label: 'Follow-ups', icon: CalendarClock },
     { to: '/device-test', label: 'Device Test', icon: Mic },

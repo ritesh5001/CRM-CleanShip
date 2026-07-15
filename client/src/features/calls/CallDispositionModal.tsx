@@ -9,6 +9,7 @@ import { useLogCall } from '@/api/calls';
 import { DISPOSITION_LABELS, DISPOSITIONS } from '@/lib/constants';
 import { useCallStore } from '@/store/call';
 import type { CallStatus, Disposition } from '@/types';
+import { SaveCustomContactModal } from './SaveCustomContactModal';
 
 function fmtDuration(sec: number) {
   if (!sec) return '0s';
@@ -27,6 +28,8 @@ export function CallDispositionModal() {
   const [disposition, setDisposition] = useState<Disposition>('interested');
   const [remark, setRemark] = useState('');
   const [nextFollowUpAt, setNextFollowUpAt] = useState('');
+  // Set after a custom call is logged → opens the (skippable) save-contact step.
+  const [savePrompt, setSavePrompt] = useState<{ callLogId: string; phone: string } | null>(null);
 
   // Reset the form each time a new call ends.
   useEffect(() => {
@@ -38,13 +41,26 @@ export function CallDispositionModal() {
     }
   }, [pending]);
 
+  // The save-contact step outlives `pending` (cleared once the call is logged).
+  if (savePrompt) {
+    return (
+      <SaveCustomContactModal
+        callLogId={savePrompt.callLogId}
+        phone={savePrompt.phone}
+        onDone={() => setSavePrompt(null)}
+      />
+    );
+  }
+
   if (!pending) return null;
 
   function submit() {
     if (!pending) return;
+    const isCustom = !pending.leadId;
+    const phone = pending.phone;
     logCall.mutate(
       {
-        lead: pending.leadId,
+        lead: pending.leadId ?? undefined,
         callStatus,
         disposition: callStatus === 'done' ? disposition : undefined,
         remark: remark.trim() || undefined,
@@ -52,12 +68,15 @@ export function CallDispositionModal() {
         nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt).toISOString() : undefined,
         twilioCallSid: pending.twilioCallSid,
         phone: pending.phoneSlot,
-        phoneNumber: pending.phone,
+        phoneNumber: phone,
       },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
           toast.success('Call logged');
           clearPending();
+          // Custom number → offer to save it as a contact (skippable).
+          const callLogId = (res as { callLog?: { _id?: string } })?.callLog?._id;
+          if (isCustom && callLogId) setSavePrompt({ callLogId, phone });
         },
         onError: (err) => toast.error(apiError(err)),
       }

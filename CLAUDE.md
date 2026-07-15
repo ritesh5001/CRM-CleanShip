@@ -82,7 +82,8 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
-- **CallLog** — one row per call activity (so Recents/history is complete): `lead, telecaller,
+- **CallLog** — one row per call activity (so Recents/history is complete): `lead` (**optional** — a
+  custom dial to an unsaved number has no contact; see Dialer), `telecaller,
   disposition? (set when connected), callStatus (connected|not_connected|voicemail|incorrect_no),
   notes, durationSec, nextFollowUpAt, phone (phone1|phone2|phone3), phoneNumber, twilioCallSid,
   recordingUrl`. Created by `logCall` (softphone — both done AND not-connected) and by
@@ -123,6 +124,9 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   stamps `phoneNOutcome.lastCalledAt` (via `DISPOSITION_TO_PHONE_OUTCOME`), and promotes to a Lead
   (`qualified`) when interested/converted. Not-done → marks that number `not_connected`. The
   **Recents** page (`pages/RecentsPage.tsx`) lists recent calls with a scrubbable audio player.
+  `POST /calls/save-contact` — promotes a custom-dialled number into a contact after the fact and
+  back-links the CallLog already recorded for it (re-applying its disposition/remark to the new
+  contact); adopts an existing contact with the same number rather than duplicating it.
   Twilio browser calling (optional, see below): `GET /calls/config` ({enabled}),
   `GET /calls/token` (mints a Voice access token), `GET /calls/:id/recording` (auth-proxied
   recording audio stream — telecaller scoped to own calls); public Twilio webhooks
@@ -226,6 +230,24 @@ returned only as `*Set` flags). One-time Twilio-console setup: create an API Key
 Voice URL is the panel's shown `voiceWebhookUrl` (`https://<server>/api/v1/calls/voice`); set the
 panel's "Public server URL" (or `PUBLIC_SERVER_URL`) so recording webhooks resolve — use ngrok
 locally.
+
+## Dialer, DTMF & custom calls
+
+- **Dialer** (`pages/DialerPage.tsx`, `/dialer`, both roles) places a call to any number that isn't a
+  saved contact. Numbers are normalized with `toE164`; a local number typed without a country code
+  can only be resolved when the integration's `defaultCountryCode` is set, so the dialer says which
+  is missing rather than just refusing to dial.
+- **DTMF / IVR**: `useCallStore.sendDigit(d)` wraps Twilio's `call.sendDigits`, gated to `phase ===
+  'in_call'` (Twilio drops tones sent while ringing). The keypad (`features/calls/Keypad.tsx`) is
+  shared by the dialer and the in-call panel in `CallBar`; while it's open the physical number row
+  types DTMF straight through.
+- **Custom calls have no contact.** `CallLog.lead` is optional and `logCall` skips all lead mutation
+  when it's absent, so the call + outcome are always recorded (validator requires *either* `lead` or
+  `phoneNumber`). After logging, `SaveCustomContactModal` offers a **skippable** save-as-contact
+  step; skipping leaves the call in Recents labelled "Not saved as a contact". Anything rendering a
+  CallLog must handle `lead: null`.
+- In dev builds only, `window.callStore` exposes the softphone store (state is otherwise unreachable
+  outside a live call); `import.meta.env.DEV` strips it from production bundles.
 
 ## Notes for future work
 

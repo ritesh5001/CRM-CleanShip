@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Grid3x3 } from 'lucide-react';
 import { useCallStore } from '@/store/call';
+import { Keypad } from './Keypad';
 
 function fmtElapsed(sec: number) {
   const m = Math.floor(sec / 60);
@@ -18,8 +19,11 @@ export function CallBar() {
   const error = useCallStore((s) => s.error);
   const toggleMute = useCallStore((s) => s.toggleMute);
   const hangup = useCallStore((s) => s.hangup);
+  const sendDigit = useCallStore((s) => s.sendDigit);
+  const digitsSent = useCallStore((s) => s.digitsSent);
 
   const [elapsed, setElapsed] = useState(0);
+  const [keypadOpen, setKeypadOpen] = useState(false);
 
   // Tick the live timer once the call is connected.
   useEffect(() => {
@@ -29,6 +33,27 @@ export function CallBar() {
     return () => clearInterval(id);
   }, [phase, startedAt]);
 
+  // Don't leave the keypad hanging open over the next call.
+  useEffect(() => {
+    if (phase !== 'in_call') setKeypadOpen(false);
+  }, [phase]);
+
+  // While the keypad is open, the number row types DTMF straight through — the
+  // fastest way to answer "press 1 for sales" without hunting for the button.
+  useEffect(() => {
+    if (!keypadOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (/^[0-9*#]$/.test(e.key)) {
+        e.preventDefault();
+        sendDigit(e.key);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [keypadOpen, sendDigit]);
+
   // Only show while a call is live (the disposition modal takes over once ended).
   if (phase !== 'connecting' && phase !== 'ringing' && phase !== 'in_call') return null;
 
@@ -36,7 +61,23 @@ export function CallBar() {
     phase === 'connecting' ? 'Connecting…' : phase === 'ringing' ? 'Ringing…' : fmtElapsed(elapsed);
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-4 sm:bottom-4">
+    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 px-3 pb-4 sm:bottom-4">
+      {keypadOpen && (
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-2 flex h-6 items-center justify-between">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Press a key to send it to the menu
+            </span>
+            {digitsSent && (
+              <span className="font-mono text-sm font-semibold tracking-widest text-slate-800 dark:text-slate-100">
+                {digitsSent}
+              </span>
+            )}
+          </div>
+          <Keypad size="sm" onPress={sendDigit} />
+        </div>
+      )}
+
       <div className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
           <Phone size={16} />
@@ -54,6 +95,19 @@ export function CallBar() {
           </p>
         </div>
 
+        <button
+          onClick={() => setKeypadOpen((o) => !o)}
+          disabled={phase !== 'in_call'}
+          title={phase === 'in_call' ? 'Keypad (for phone menus)' : 'Keypad available once connected'}
+          aria-pressed={keypadOpen}
+          className={`rounded-full p-2.5 disabled:opacity-40 ${
+            keypadOpen
+              ? 'bg-brand-600 text-white hover:bg-brand-700'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Grid3x3 size={18} />
+        </button>
         <button
           onClick={toggleMute}
           disabled={phase !== 'in_call'}

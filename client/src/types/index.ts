@@ -117,7 +117,8 @@ export type Disposition =
 
 export interface CallLog {
   _id: string;
-  lead: Lead | string;
+  /** Null for a custom-dialled number that was never saved as a contact. */
+  lead: Lead | string | null;
   telecaller: User | string;
   disposition?: Disposition;
   callStatus?: PhoneCallStatus;
