@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Delete, Phone, AlertTriangle } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Delete, Phone, AlertTriangle, Plus } from 'lucide-react';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Misc';
@@ -30,18 +30,24 @@ export function DialerPage() {
   // E.164 — that's a setup gap, not a typo, so say which it is.
   const needsCountryCode = Boolean(typed) && !valid && !typed.startsWith('+') && !defaultCode;
 
+  // A '+' only means anything as the country-code prefix, so it's ignored mid-number
+  // rather than silently producing something that can never dial.
+  const addChar = useCallback((ch: string) => {
+    setNumber((n) => (ch === '+' && n.length ? n : n + ch));
+  }, []);
+
   // Type on the physical keyboard as well as the on-screen pad.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (callActive) return; // digits belong to the in-call keypad instead
-      if (/^[0-9*#+]$/.test(e.key)) setNumber((n) => n + e.key);
+      if (/^[0-9*#+]$/.test(e.key)) addChar(e.key);
       else if (e.key === 'Backspace') setNumber((n) => n.slice(0, -1));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [callActive]);
+  }, [callActive, addChar]);
 
   function dial() {
     if (!valid || callActive) return;
@@ -96,9 +102,20 @@ export function DialerPage() {
           </div>
         </div>
 
-        <Keypad disabled={callActive} onPress={(d) => setNumber((n) => n + d)} />
+        <Keypad longPressPlus disabled={callActive} onPress={addChar} />
 
         <div className="mt-3 flex items-center gap-2">
+          {/* A '+' is required for any international number, and long-pressing 0
+              (the phone convention) isn't discoverable on its own. */}
+          <Button
+            variant="secondary"
+            aria-label="Add plus"
+            title="Country code prefix (or hold 0)"
+            disabled={callActive}
+            onClick={() => addChar('+')}
+          >
+            <Plus size={15} />
+          </Button>
           <Button
             variant="success"
             className="flex-1"
