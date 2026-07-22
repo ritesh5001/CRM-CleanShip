@@ -10,3 +10,4 @@ coverage/
 .vite/
 *.tsbuildinfo
 uploads/
+*.csv
