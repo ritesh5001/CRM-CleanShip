@@ -35,6 +35,19 @@ export function toE164(raw: string, country?: string | null, defaultCode?: strin
   if (parsed && parsed.isValid()) return parsed.number; // E.164, e.g. +14102927721
   if (cleaned.startsWith('+')) return cleaned;
   const code = (defaultCode || '').trim();
-  if (code) return `${code.startsWith('+') ? code : `+${code}`}${cleaned.replace(/^0+/, '')}`;
-  return cleaned;
+  if (!code) return cleaned;
+  const plusCode = code.startsWith('+') ? code : `+${code}`;
+  // A number that already begins with its own country code (typed without the '+',
+  // e.g. `97143062043`) must not get a second one prepended — that produces
+  // `+97197143062043`, which Twilio rejects as unreachable. Only treat the digits
+  // as *local* when prefixing actually yields a valid number.
+  const asIs = parsePhoneNumberFromString(`+${cleaned}`);
+  const local = cleaned.replace(/^0+/, '');
+  const prefixed = parsePhoneNumberFromString(`${plusCode}${local}`);
+  if (asIs?.isValid() && !prefixed?.isValid()) return asIs.number;
+  if (prefixed?.isValid()) return prefixed.number;
+  // Neither parses cleanly: fall back to treating an already-country-coded number
+  // as complete rather than double-prefixing it.
+  if (asIs?.isPossible()) return asIs.number;
+  return `${plusCode}${local}`;
 }

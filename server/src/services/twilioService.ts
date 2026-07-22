@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
 import { User } from '../models/User.js';
@@ -34,14 +35,27 @@ function publicBase(s: IntegrationDoc | null): string | undefined {
 /**
  * Ensures a number is E.164: if it has no leading '+', prepends the default
  * country code (stripping any leading zeros from the local part).
+ *
+ * A number that already carries its own country code but was typed/stored without
+ * the '+' (e.g. `97143062043`) must NOT be prefixed again — `+97197143062043` is
+ * not a real number and Twilio fails the dial as invalid/unreachable. We only
+ * treat the digits as local when prefixing actually produces a valid number.
  */
 export function toE164(raw: string, defaultCountryCode?: string): string {
   const cleaned = raw.trim().replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) return `+${cleaned.slice(1).replace(/\+/g, '')}`;
-  const local = cleaned.replace(/\+/g, '').replace(/^0+/, '');
+  const digits = cleaned.replace(/\+/g, '');
+  const local = digits.replace(/^0+/, '');
   const code = (defaultCountryCode || '').trim();
-  if (!code) return local;
-  return `${code.startsWith('+') ? code : `+${code}`}${local}`;
+  if (!code) return digits;
+  const plusCode = code.startsWith('+') ? code : `+${code}`;
+
+  const asIs = parsePhoneNumberFromString(`+${digits}`);
+  const prefixed = parsePhoneNumberFromString(`${plusCode}${local}`);
+  if (asIs?.isValid() && !prefixed?.isValid()) return asIs.number;
+  if (prefixed?.isValid()) return prefixed.number;
+  if (asIs?.isPossible()) return asIs.number;
+  return `${plusCode}${local}`;
 }
 
 /**
