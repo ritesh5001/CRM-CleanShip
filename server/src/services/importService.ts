@@ -3,6 +3,7 @@ import { Lead } from '../models/Lead.js';
 import { ImportBatch } from '../models/ImportBatch.js';
 import { getTwilioSettings } from './twilioService.js';
 import { phoneKey } from '../utils/phone.js';
+import { compactPhoneFields } from '../utils/phoneSlots.js';
 
 interface RawRow {
   [key: string]: unknown;
@@ -183,6 +184,12 @@ export async function importLeads(
       industry = pick(row, ['industry']);
       notes = pick(row, ['notes', 'remark', 'remarks', 'comment']);
     }
+
+    // An admin column mapping can leave a hole (phone2 blank, phone3 filled) —
+    // compact so imported contacts always fill phone1, then phone2, then phone3.
+    // Runs before the missing-phone guard so a row carrying only an alt number is
+    // imported (promoted to phone1) instead of being rejected as phone-less.
+    ({ phone, altPhone, altPhone2 } = compactPhoneFields({ phone, altPhone, altPhone2 }));
 
     if (!name && !phone) return; // skip fully empty rows silently
     if (!phone) {

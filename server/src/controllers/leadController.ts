@@ -13,6 +13,29 @@ import type { FieldMapping } from '../services/importService.js';
 import { notify } from '../services/notificationService.js';
 import { idOf } from '../utils/idOf.js';
 import type { PhoneOutcomeInput } from '../validators/leadValidators.js';
+import { compactPhoneFields, compactPhoneSlots, type SlotRemap } from '../utils/phoneSlots.js';
+
+/**
+ * Slides a lead's filled phone numbers up so the slots stay gap-free, moving each
+ * number's outcome, remarks and call logs along with it. Does NOT save the lead —
+ * the caller saves (it is already saving for its own edits).
+ */
+async function compactLeadPhones(lead: InstanceType<typeof Lead>): Promise<SlotRemap> {
+  const remap = compactPhoneSlots(lead);
+  if (remap.size === 0) return remap;
+
+  for (const remark of lead.remarks as unknown as { phone?: 'phone1' | 'phone2' | 'phone3' | null }[]) {
+    const target = remark.phone ? remap.get(remark.phone) : undefined;
+    if (target) remark.phone = target;
+  }
+  lead.markModified('remarks');
+
+  // Per old-slot, so a log is never shifted twice (e.g. phone3→phone2 then phone2→phone1).
+  for (const [from, to] of remap) {
+    await CallLog.updateMany({ lead: lead._id, phone: from }, { $set: { phone: to } });
+  }
+  return remap;
+}
 
 // Builds the Mongo filter from query params. `includeCallStatus=false` is used by
 // the stats endpoint so chip counts reflect every callStatus within the same scope.
@@ -144,7 +167,7 @@ export const getLead = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createLead = asyncHandler(async (req: Request, res: Response) => {
-  const body = { ...req.body };
+  const body = compactPhoneFields({ ...req.body });
   if (body.assignedTo) {
     body.status = 'assigned';
     body.assignedAt = new Date();
@@ -171,6 +194,9 @@ export const updateLead = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.forbidden('This lead is not assigned to you');
   }
   Object.assign(lead, req.body);
+  // Clearing/editing a number inline can leave a hole (e.g. phone2 emptied while
+  // phone3 is filled) — slide the rest up so the slots stay contiguous.
+  await compactLeadPhones(lead);
   await lead.save();
   res.json({ success: true, lead });
 });

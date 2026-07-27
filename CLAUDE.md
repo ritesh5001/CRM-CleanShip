@@ -80,6 +80,11 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   Statuses: new, assigned, in_progress, interested, callback, not_interested, converted, dnd.
   `remarks[]` is a shared timeline `{ text, by, byName, byRole, createdAt }` both roles append to.
   **Contacts** = all records; **Leads** = `qualified:true` (set when a call outcome is interested/converted).
+  **Phone slots are gap-free:** the three numbers (`phone`=phone1, `altPhone`=phone2,
+  `altPhone2`=phone3) always fill from the top — phone2 is never blank while phone3 is filled.
+  `utils/phoneSlots.ts` enforces it on create/update/import; when a number shifts up it carries its
+  `phoneNOutcome`, its `remarks[].phone` tags and its `CallLog.phone` rows with it (`compactLeadPhones`
+  in `leadController`). Existing data was backfilled by `scripts/compactPhones.ts`.
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
 - **CallLog** — one row per call activity (so Recents/history is complete): `lead` (**optional** — a
@@ -189,6 +194,7 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 npm run install:all        # install all deps
 npm run seed               # seed superadmin + default workspace + demo data
 npm run migrate:workspaces # one-time: move pre-workspace data into "Hull Cleaning"
+npm run migrate:phones     # one-time: close gaps in the phone1/2/3 slots (--dry-run to preview)
 npm run dev                # API (:5050) + client (:5173)
 npm run build              # build both
 npm run typecheck          # tsc --noEmit in both packages
