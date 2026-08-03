@@ -125,7 +125,9 @@ export function useUpdateTwilioIntegration() {
 
 export interface TelecmiDetectResult {
   region: 'india' | 'global' | null;
-  tried: { region: 'india' | 'global'; ok: boolean; detail: string }[];
+  /** Both platforms accepted the credentials but neither shows any calls. */
+  ambiguous: boolean;
+  tried: { region: 'india' | 'global'; ok: boolean; total: number; detail: string }[];
 }
 
 /** Probes both CHUB platforms with the given credentials to see which accepts them. */

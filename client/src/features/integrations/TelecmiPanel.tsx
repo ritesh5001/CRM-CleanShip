@@ -235,6 +235,14 @@ export function TelecmiPanel() {
           if (res.region) {
             set('apiRegion', res.region);
             toast.success(`Your account is on ${res.region === 'india' ? 'India (chub-india)' : 'Global (chub)'} — selected. Save to apply.`);
+          } else if (res.ambiguous) {
+            // Credentials work on both and neither has call history to tell them
+            // apart — say so rather than silently picking one.
+            toast.error(
+              'Both platforms accept these credentials and neither shows any calls yet, so the region ' +
+                'is ambiguous. Place one test call from the TeleCMI app, then press this again.',
+              { duration: 10000 }
+            );
           } else {
             // Neither accepted the credentials — report what each said.
             const detail = res.tried.map((t) => `${t.region}: ${t.detail}`).join(' · ');

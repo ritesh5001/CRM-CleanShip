@@ -255,16 +255,23 @@ export function reasonForCdr(status?: string, hangupReason?: string): string | u
  * Works out which CHUB platform an account lives on by asking both.
  *
  * The Analysis API is the cheapest credential check TeleCMI offers — it needs only
- * the app id + secret and returns `code: 200` when they're valid. Whichever platform
- * accepts them is the one this account is on, which beats guessing from the SBC
- * region (a wrong guess surfaces later as an opaque auth failure on every call).
+ * the app id + secret and returns `code: 200` when they're valid.
+ *
+ * **Both platforms can accept the same credentials** (verified against a live
+ * account), so "first one that answers 200" picks the wrong platform. The account's
+ * calls only exist on one of them, so we compare the call totals the Analysis API
+ * reports and choose where the traffic actually is. Only when both are credentialed
+ * *and* both are empty is the answer genuinely ambiguous.
  */
 export async function detectApiRegion(
   appId: string,
   apiSecret: string
-): Promise<{ region: ApiRegion | null; tried: { region: ApiRegion; ok: boolean; detail: string }[] }> {
-  const tried: { region: ApiRegion; ok: boolean; detail: string }[] = [];
-  let region: ApiRegion | null = null;
+): Promise<{
+  region: ApiRegion | null;
+  ambiguous: boolean;
+  tried: { region: ApiRegion; ok: boolean; total: number; detail: string }[];
+}> {
+  const tried: { region: ApiRegion; ok: boolean; total: number; detail: string }[] = [];
 
   for (const candidate of API_REGIONS.map((r) => r.id)) {
     const ep = ENDPOINTS[candidate];
@@ -275,25 +282,42 @@ export async function detectApiRegion(
         // The date range is optional on India but *required* on Global, which
         // schema-checks before it authenticates — omit it and Global always 400s,
         // so detection could never pick it. A 24h window keeps the response small.
+        // A 30-day window: long enough that a low-volume account still shows
+        // traffic, which is what distinguishes the two platforms.
         body: JSON.stringify({
           appid: Number(appId) || appId,
           [ep.secretParam]: apiSecret,
-          start_date: Date.now() - 24 * 60 * 60 * 1000,
+          start_date: Date.now() - 30 * 24 * 60 * 60 * 1000,
           end_date: Date.now(),
         }),
       });
-      const data = (await resp.json().catch(() => null)) as { code?: number; msg?: string } | null;
+      const data = (await resp.json().catch(() => null)) as
+        | { code?: number; msg?: string; total?: number }
+        | null;
       const ok = resp.ok && data?.code === 200;
+      const total = ok ? Number(data?.total) || 0 : 0;
       tried.push({
         region: candidate,
         ok,
-        detail: ok ? 'credentials accepted' : data?.msg || `HTTP ${resp.status}`,
+        total,
+        detail: ok ? `credentials accepted · ${total} calls in 30d` : data?.msg || `HTTP ${resp.status}`,
       });
-      if (ok && !region) region = candidate;
     } catch (e) {
-      tried.push({ region: candidate, ok: false, detail: e instanceof Error ? e.message : 'unreachable' });
+      tried.push({
+        region: candidate,
+        ok: false,
+        total: 0,
+        detail: e instanceof Error ? e.message : 'unreachable',
+      });
     }
   }
 
-  return { region, tried };
+  const accepted = tried.filter((t) => t.ok);
+  if (accepted.length === 0) return { region: null, ambiguous: false, tried };
+
+  // Prefer whichever platform actually holds this account's call history.
+  const best = accepted.reduce((a, b) => (b.total > a.total ? b : a));
+  const ambiguous = accepted.length > 1 && best.total === 0;
+
+  return { region: ambiguous ? null : best.region, ambiguous, tried };
 }
