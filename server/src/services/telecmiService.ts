@@ -43,18 +43,20 @@ export const DEFAULT_API_REGION: ApiRegion = 'india';
 
 const ENDPOINTS: Record<
   ApiRegion,
-  { login: string; connect: string; play: string; secretParam: 'token' | 'secret' }
+  { login: string; connect: string; play: string; analysis: string; secretParam: 'token' | 'secret' }
 > = {
   india: {
     login: 'https://piopiy.telecmi.com/v1/agentLogin',
     connect: 'https://piopiy.telecmi.com/v1/agentConnect',
     play: 'https://piopiy.telecmi.com/v1/play',
+    analysis: 'https://piopiy.telecmi.com/v1/analysis',
     secretParam: 'token',
   },
   global: {
     login: 'https://rest.telecmi.com/v2/user/login',
     connect: 'https://rest.telecmi.com/v2/click2call',
     play: 'https://rest.telecmi.com/v2/play',
+    analysis: 'https://rest.telecmi.com/v2/analysis',
     secretParam: 'secret',
   },
 };
@@ -247,4 +249,51 @@ export function reasonForCdr(status?: string, hangupReason?: string): string | u
     default:
       return status === 'missed' ? 'No answer.' : undefined;
   }
+}
+
+/**
+ * Works out which CHUB platform an account lives on by asking both.
+ *
+ * The Analysis API is the cheapest credential check TeleCMI offers — it needs only
+ * the app id + secret and returns `code: 200` when they're valid. Whichever platform
+ * accepts them is the one this account is on, which beats guessing from the SBC
+ * region (a wrong guess surfaces later as an opaque auth failure on every call).
+ */
+export async function detectApiRegion(
+  appId: string,
+  apiSecret: string
+): Promise<{ region: ApiRegion | null; tried: { region: ApiRegion; ok: boolean; detail: string }[] }> {
+  const tried: { region: ApiRegion; ok: boolean; detail: string }[] = [];
+  let region: ApiRegion | null = null;
+
+  for (const candidate of API_REGIONS.map((r) => r.id)) {
+    const ep = ENDPOINTS[candidate];
+    try {
+      const resp = await fetch(ep.analysis, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // The date range is optional on India but *required* on Global, which
+        // schema-checks before it authenticates — omit it and Global always 400s,
+        // so detection could never pick it. A 24h window keeps the response small.
+        body: JSON.stringify({
+          appid: Number(appId) || appId,
+          [ep.secretParam]: apiSecret,
+          start_date: Date.now() - 24 * 60 * 60 * 1000,
+          end_date: Date.now(),
+        }),
+      });
+      const data = (await resp.json().catch(() => null)) as { code?: number; msg?: string } | null;
+      const ok = resp.ok && data?.code === 200;
+      tried.push({
+        region: candidate,
+        ok,
+        detail: ok ? 'credentials accepted' : data?.msg || `HTTP ${resp.status}`,
+      });
+      if (ok && !region) region = candidate;
+    } catch (e) {
+      tried.push({ region: candidate, ok: false, detail: e instanceof Error ? e.message : 'unreachable' });
+    }
+  }
+
+  return { region, tried };
 }

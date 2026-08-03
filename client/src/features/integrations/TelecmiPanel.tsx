@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   useTelecmiIntegration,
   useUpdateTelecmiIntegration,
+  useDetectTelecmiRegion,
   type TelecmiIntegrationUpdate,
 } from '@/api/integrations';
 import { useTelecallers, useSetTelecallerTelecmi } from '@/api/users';
@@ -181,6 +182,7 @@ function AgentAssignmentCard() {
 export function TelecmiPanel() {
   const { data, isLoading } = useTelecmiIntegration();
   const update = useUpdateTelecmiIntegration();
+  const detect = useDetectTelecmiRegion();
   const [form, setForm] = useState<FormState>(EMPTY);
 
   useEffect(() => {
@@ -222,6 +224,26 @@ export function TelecmiPanel() {
     } catch (e) {
       toast.error(apiError(e));
     }
+  }
+
+  /** Ask TeleCMI which platform these credentials belong to, and select it. */
+  function handleDetect() {
+    detect.mutate(
+      { appId: form.appId, apiSecret: form.apiSecret || undefined },
+      {
+        onSuccess: (res) => {
+          if (res.region) {
+            set('apiRegion', res.region);
+            toast.success(`Your account is on ${res.region === 'india' ? 'India (chub-india)' : 'Global (chub)'} — selected. Save to apply.`);
+          } else {
+            // Neither accepted the credentials — report what each said.
+            const detail = res.tried.map((t) => `${t.region}: ${t.detail}`).join(' · ');
+            toast.error(`Neither platform accepted these credentials. ${detail}`, { duration: 8000 });
+          }
+        },
+        onError: (e) => toast.error(apiError(e)),
+      }
+    );
   }
 
   function copy(text: string) {
@@ -316,10 +338,15 @@ export function TelecmiPanel() {
                 </option>
               ))}
             </Select>
-            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-              Which TeleCMI platform your account is on. Every API endpoint differs between the two —
-              pick India unless TeleCMI told you otherwise.
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <Button variant="secondary" onClick={handleDetect} disabled={detect.isPending || !form.appId}>
+                {detect.isPending ? 'Testing…' : 'Test & detect'}
+              </Button>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Every API endpoint differs between the two. Enter your App ID + secret and press this to
+                find out which one your account is on.
+              </p>
+            </div>
           </div>
           <div>
             <Label>SBC region</Label>

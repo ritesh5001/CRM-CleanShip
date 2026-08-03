@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiError } from '../utils/ApiError.js';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
 import { TWILIO_KEY, listNumbers } from '../services/twilioService.js';
-import { TELECMI_KEY, DEFAULT_SBC_URI, SBC_REGIONS, DEFAULT_API_REGION, API_REGIONS } from '../services/telecmiService.js';
+import { TELECMI_KEY, DEFAULT_SBC_URI, SBC_REGIONS, DEFAULT_API_REGION, API_REGIONS, detectApiRegion } from '../services/telecmiService.js';
 import type { UpdateTwilioInput, UpdateTelecmiInput } from '../validators/integrationValidators.js';
 
 // Fields the admin form sends that are kept secret: blanks mean "leave unchanged",
@@ -126,4 +127,21 @@ export const updateTelecmiIntegration = asyncHandler(async (req: Request, res: R
   await doc.save();
 
   res.json({ success: true, data: sanitizeTelecmi(doc) });
+});
+
+// POST /integrations/telecmi/detect (superadmin) — works out which CHUB platform
+// the account is on by trying the credentials against both. Uses the values the
+// admin has typed, falling back to the stored secret (which is never sent back to
+// the browser, so the form field is blank once saved).
+export const detectTelecmiRegion = asyncHandler(async (req: Request, res: Response) => {
+  const doc = await Integration.findOne({ key: TELECMI_KEY });
+  const appId = String(req.body.appId || doc?.appId || '').trim();
+  const apiSecret = String(req.body.apiSecret || doc?.apiSecret || '').trim();
+
+  if (!appId || !apiSecret) {
+    throw ApiError.badRequest('Enter the App ID and API secret first, then test.');
+  }
+
+  const { region, tried } = await detectApiRegion(appId, apiSecret);
+  res.json({ success: true, region, tried });
 });

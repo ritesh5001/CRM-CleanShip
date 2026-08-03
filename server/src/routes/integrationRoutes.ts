@@ -16,5 +16,6 @@ router.get('/twilio/numbers', ctrl.listTwilioNumbers);
 
 router.get('/telecmi', ctrl.getTelecmiIntegration);
 router.put('/telecmi', validate(updateTelecmiSchema), ctrl.updateTelecmiIntegration);
+router.post('/telecmi/detect', ctrl.detectTelecmiRegion);
 
 export default router;

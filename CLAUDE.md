@@ -254,7 +254,13 @@ is no shared base URL; a wrong region fails auth rather than erroring usefully. 
 | agent login | `piopiy.telecmi.com/v1/agentLogin` | `rest.telecmi.com/v2/user/login` |
 | click-to-call | `piopiy.telecmi.com/v1/agentConnect` | `rest.telecmi.com/v2/click2call` |
 | recording | `piopiy.telecmi.com/v1/play` | `rest.telecmi.com/v2/play` |
+| analysis | `piopiy.telecmi.com/v1/analysis` | `rest.telecmi.com/v2/analysis` |
 | secret param | `token` | `secret` |
+
+Don't guess the region — the panel's **Test & detect** button (`POST /integrations/telecmi/detect` →
+`detectApiRegion`) posts the app id + secret to *both* Analysis APIs and selects whichever returns
+`code:200`. Note the probe must send `start_date`/`end_date`: Global schema-checks before it
+authenticates, so omitting them 400s regardless of credentials.
 
 - **Config** (`Integration` doc `key:'telecmi'`, admin panel → `features/integrations/TelecmiPanel.tsx`):
   `enabled, appId, apiSecret (secret), apiRegion, sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.

@@ -122,3 +122,17 @@ export function useUpdateTwilioIntegration() {
     },
   });
 }
+
+export interface TelecmiDetectResult {
+  region: 'india' | 'global' | null;
+  tried: { region: 'india' | 'global'; ok: boolean; detail: string }[];
+}
+
+/** Probes both CHUB platforms with the given credentials to see which accepts them. */
+export function useDetectTelecmiRegion() {
+  return useMutation({
+    mutationFn: async (creds: { appId: string; apiSecret?: string }) =>
+      (await api.post<{ success: boolean } & TelecmiDetectResult>('/integrations/telecmi/detect', creds))
+        .data,
+  });
+}
