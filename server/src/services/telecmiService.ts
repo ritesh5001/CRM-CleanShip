@@ -25,12 +25,45 @@ import { User } from '../models/User.js';
 
 export const TELECMI_KEY = 'telecmi';
 
-const AGENT_LOGIN_URL = 'https://piopiy.telecmi.com/v1/agentLogin';
-const AGENT_CONNECT_URL = 'https://piopiy.telecmi.com/v1/agentConnect';
-// Recording playback for the TeleCMI cloud phone system (Connle dashboard).
-// NB: this is `/v2/play` with an `appid` + `secret` — not PIOPIY's `/v2/piopiy/play`
-// with a `token`, which belongs to their separate programmable-telephony product.
-const RECORDING_URL = 'https://rest.telecmi.com/v2/play';
+/**
+ * TeleCMI runs two separate CHUB platforms and **every** endpoint differs between
+ * them — including the query-parameter name for the app secret. Getting this wrong
+ * fails authentication rather than erroring usefully, so the region is an explicit
+ * admin setting rather than something we guess.
+ *
+ * Docs: doc.telecmi.com/chub-india (India) · doc.telecmi.com/chub (Global).
+ */
+export const API_REGIONS = [
+  { id: 'india', label: 'India (chub-india)' },
+  { id: 'global', label: 'Global (chub)' },
+] as const;
+export type ApiRegion = (typeof API_REGIONS)[number]['id'];
+
+export const DEFAULT_API_REGION: ApiRegion = 'india';
+
+const ENDPOINTS: Record<
+  ApiRegion,
+  { login: string; connect: string; play: string; secretParam: 'token' | 'secret' }
+> = {
+  india: {
+    login: 'https://piopiy.telecmi.com/v1/agentLogin',
+    connect: 'https://piopiy.telecmi.com/v1/agentConnect',
+    play: 'https://piopiy.telecmi.com/v1/play',
+    secretParam: 'token',
+  },
+  global: {
+    login: 'https://rest.telecmi.com/v2/user/login',
+    connect: 'https://rest.telecmi.com/v2/click2call',
+    play: 'https://rest.telecmi.com/v2/play',
+    secretParam: 'secret',
+  },
+};
+
+/** The endpoint set for the configured region (defaults to India). */
+function endpointsFor(s: IntegrationDoc | null) {
+  const region = (s?.apiRegion as ApiRegion) || DEFAULT_API_REGION;
+  return ENDPOINTS[region] ?? ENDPOINTS[DEFAULT_API_REGION];
+}
 
 /** Agent tokens are valid 30 days; refresh a little early to avoid edge failures. */
 const TOKEN_TTL_MS = 29 * 24 * 60 * 60 * 1000;
@@ -114,6 +147,7 @@ export async function resolveAgentCredentials(
 export async function getAgentToken(userId: string, forceRefresh = false): Promise<string | null> {
   const user = await User.findById(userId).select('+telecmiPassword +telecmiAgentToken telecmiUserId telecmiTokenAt');
   if (!user) return null;
+  const { login: loginUrl } = endpointsFor(await getTelecmiSettings());
 
   const cached = (user.telecmiAgentToken || '').trim();
   const issuedAt = user.telecmiTokenAt ? new Date(user.telecmiTokenAt).getTime() : 0;
@@ -123,7 +157,7 @@ export async function getAgentToken(userId: string, forceRefresh = false): Promi
   const password = (user.telecmiPassword || '').trim();
   if (!sipUser || !password) return null;
 
-  const resp = await fetch(AGENT_LOGIN_URL, {
+  const resp = await fetch(loginUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: sipUser, password }),
@@ -148,12 +182,13 @@ export async function clickToCall(
 ): Promise<{ ok: true; requestId: string } | { ok: false; message: string }> {
   const s = await getTelecmiSettings();
   const number = toE164(to, s?.defaultCountryCode);
+  const { connect: connectUrl } = endpointsFor(s);
 
   for (const forceRefresh of [false, true]) {
     const token = await getAgentToken(userId, forceRefresh);
     if (!token) return { ok: false, message: 'No TeleCMI agent credentials assigned to you. Ask your admin.' };
 
-    const resp = await fetch(AGENT_CONNECT_URL, {
+    const resp = await fetch(connectUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, to: number }),
@@ -183,9 +218,11 @@ export async function fetchRecordingMedia(
   const s = await getTelecmiSettings();
   if (!s || !hasAllCreds(s) || !filename) return null;
 
-  const url = new URL(RECORDING_URL);
+  // India passes the app secret as `token`, Global as `secret` — same value.
+  const { play, secretParam } = endpointsFor(s);
+  const url = new URL(play);
   url.searchParams.set('appid', s.appId);
-  url.searchParams.set('secret', s.apiSecret);
+  url.searchParams.set(secretParam, s.apiSecret);
   url.searchParams.set('file', filename);
 
   const resp = await fetch(url);

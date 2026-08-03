@@ -241,15 +241,23 @@ locally.
 
 TeleCMI runs **alongside** Twilio; both stay configured and each user picks which one they dial with.
 
-**Which TeleCMI product:** this targets their **cloud phone system**, administered from the **Connle**
-dashboard (`connle.telecmi.com`) — *not* PIOPIY, their separate programmable-telephony platform. The
-distinction matters: recordings come from `rest.telecmi.com/v2/play?appid=&secret=&file=` (PIOPIY uses
-`/v2/piopiy/play` with a `token`), and the CDR webhook is configured under **Settings → Webhooks** in
-Connle (PIOPIY uses a "CDR URL" field + MAP APP button). The `piopiy.telecmi.com/v1/agent*` endpoints
-are shared by both products.
+**Which TeleCMI product:** this targets their **cloud phone system** (docs: "CHUB"), administered from
+the **Connle** dashboard (`connle.telecmi.com`) — *not* PIOPIY, their separate programmable-telephony
+platform (`developer.telecmi.com`). Don't follow PIOPIY docs for this integration.
+
+**Which CHUB region — this matters, every endpoint differs.** TeleCMI runs two CHUB platforms and there
+is no shared base URL; a wrong region fails auth rather than erroring usefully. `apiRegion`
+(`india`|`global`, default `india`) selects the set in `services/telecmiService.ts`:
+
+| | India (`doc.telecmi.com/chub-india`) | Global (`doc.telecmi.com/chub`) |
+|---|---|---|
+| agent login | `piopiy.telecmi.com/v1/agentLogin` | `rest.telecmi.com/v2/user/login` |
+| click-to-call | `piopiy.telecmi.com/v1/agentConnect` | `rest.telecmi.com/v2/click2call` |
+| recording | `piopiy.telecmi.com/v1/play` | `rest.telecmi.com/v2/play` |
+| secret param | `token` | `secret` |
 
 - **Config** (`Integration` doc `key:'telecmi'`, admin panel → `features/integrations/TelecmiPanel.tsx`):
-  `enabled, appId, apiSecret (secret), sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.
+  `enabled, appId, apiSecret (secret), apiRegion, sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.
   `GET/PUT /integrations/telecmi` (secret masked as `apiSecretSet`). App ID + API secret come from Connle.
 - **Per-telecaller agent:** `User.telecmiUserId` + `telecmiPassword` (both `select:false` for the
   password, also stripped in `toJSON`), assigned via `PATCH /users/:id/telecmi`. A blank password

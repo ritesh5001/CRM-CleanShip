@@ -28,6 +28,7 @@ export const updateTelecmiSchema = z.object({
   appId: z.string().trim().optional(),
   apiSecret: z.string().trim().optional(),
   sbcUri: z.string().trim().optional(),
+  apiRegion: z.enum(['india', 'global']).optional(),
   recordCalls: z.boolean().optional(),
   publicServerUrl: z.string().trim().optional(),
   defaultCountryCode: z

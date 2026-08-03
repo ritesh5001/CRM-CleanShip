@@ -17,6 +17,7 @@ interface FormState {
   recordCalls: boolean;
   appId: string;
   sbcUri: string;
+  apiRegion: 'india' | 'global';
   defaultCountryCode: string;
   publicServerUrl: string;
   apiSecret: string;
@@ -41,6 +42,7 @@ const EMPTY: FormState = {
   recordCalls: true,
   appId: '',
   sbcUri: DEFAULT_SBC_URI,
+  apiRegion: 'india',
   defaultCountryCode: '',
   publicServerUrl: '',
   apiSecret: '',
@@ -189,6 +191,7 @@ export function TelecmiPanel() {
         appId: data.appId,
         // Never leave the select on a blank value — it would save an empty region.
         sbcUri: data.sbcUri || DEFAULT_SBC_URI,
+        apiRegion: data.apiRegion || 'india',
         defaultCountryCode: data.defaultCountryCode,
         publicServerUrl: data.publicServerUrl,
         apiSecret: '',
@@ -206,6 +209,7 @@ export function TelecmiPanel() {
       recordCalls: form.recordCalls,
       appId: form.appId,
       sbcUri: form.sbcUri,
+      apiRegion: form.apiRegion,
       defaultCountryCode: form.defaultCountryCode,
       publicServerUrl: form.publicServerUrl,
     };
@@ -293,6 +297,29 @@ export function TelecmiPanel() {
               onChange={(e) => set('apiSecret', e.target.value)}
               placeholder={data?.apiSecretSet ? 'Leave blank to keep current' : 'xx-xx'}
             />
+          </div>
+          <div>
+            <Label>API platform</Label>
+            <Select
+              value={form.apiRegion}
+              onChange={(e) => set('apiRegion', e.target.value as 'india' | 'global')}
+            >
+              {(data?.apiRegions?.length
+                ? data.apiRegions
+                : [
+                    { id: 'india', label: 'India (chub-india)' },
+                    { id: 'global', label: 'Global (chub)' },
+                  ]
+              ).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              Which TeleCMI platform your account is on. Every API endpoint differs between the two —
+              pick India unless TeleCMI told you otherwise.
+            </p>
           </div>
           <div>
             <Label>SBC region</Label>

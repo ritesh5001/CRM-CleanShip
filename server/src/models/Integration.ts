@@ -22,6 +22,9 @@ const integrationSchema = new Schema(
     apiSecret: { type: String, default: '' }, // secret
     // Regional SBC the browser softphone registers against, e.g. 'sbcind.telecmi.com'.
     sbcUri: { type: String, default: '' },
+    // Which TeleCMI CHUB platform this account lives on — 'india' or 'global'.
+    // Every REST endpoint differs between them (see telecmiService).
+    apiRegion: { type: String, enum: ['india', 'global'], default: 'india' },
     // Call behaviour.
     recordCalls: { type: Boolean, default: true },
     // Prepended to dialled numbers that have no country code (e.g. '+91').

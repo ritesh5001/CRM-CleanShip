@@ -3,7 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
 import { TWILIO_KEY, listNumbers } from '../services/twilioService.js';
-import { TELECMI_KEY, DEFAULT_SBC_URI, SBC_REGIONS } from '../services/telecmiService.js';
+import { TELECMI_KEY, DEFAULT_SBC_URI, SBC_REGIONS, DEFAULT_API_REGION, API_REGIONS } from '../services/telecmiService.js';
 import type { UpdateTwilioInput, UpdateTelecmiInput } from '../validators/integrationValidators.js';
 
 // Fields the admin form sends that are kept secret: blanks mean "leave unchanged",
@@ -84,11 +84,13 @@ function sanitizeTelecmi(doc: IntegrationDoc | null) {
     configured: Boolean(doc?.appId && doc?.apiSecret),
     appId: doc?.appId ?? '',
     sbcUri: doc?.sbcUri || DEFAULT_SBC_URI,
+    apiRegion: doc?.apiRegion || DEFAULT_API_REGION,
     recordCalls: doc?.recordCalls ?? true,
     defaultCountryCode: doc?.defaultCountryCode ?? '',
     publicServerUrl: doc?.publicServerUrl ?? '',
     apiSecretSet: Boolean(doc?.apiSecret),
     sbcRegions: SBC_REGIONS,
+    apiRegions: API_REGIONS,
     // Paste this into the PIOPIY dashboard's "CDR URL" so call records reach us.
     cdrWebhookUrl: base ? `${base}/api/v1/calls/telecmi/cdr` : '',
   };
@@ -110,6 +112,7 @@ export const updateTelecmiIntegration = asyncHandler(async (req: Request, res: R
     'enabled',
     'appId',
     'sbcUri',
+    'apiRegion',
     'recordCalls',
     'defaultCountryCode',
     'publicServerUrl',

@@ -65,11 +65,13 @@ export interface TelecmiIntegration {
   configured: boolean;
   appId: string;
   sbcUri: string;
+  apiRegion: 'india' | 'global';
   recordCalls: boolean;
   defaultCountryCode: string;
   publicServerUrl: string;
   apiSecretSet: boolean;
   sbcRegions: { uri: string; label: string }[];
+  apiRegions: { id: string; label: string }[];
   /** Paste into the PIOPIY dashboard's "CDR URL" so call records reach us. */
   cdrWebhookUrl: string;
 }
@@ -79,6 +81,7 @@ export interface TelecmiIntegrationUpdate {
   appId?: string;
   apiSecret?: string;
   sbcUri?: string;
+  apiRegion?: 'india' | 'global';
   recordCalls?: boolean;
   defaultCountryCode?: string;
   publicServerUrl?: string;
