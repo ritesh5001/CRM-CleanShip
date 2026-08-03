@@ -22,11 +22,25 @@ interface FormState {
   apiToken: string;
 }
 
+/**
+ * The SBC regions TeleCMI exposes. The server sends this list too, but keeping a
+ * local copy means the dropdown is still usable if that request fails — otherwise
+ * the admin is left with an empty select and no way to pick a region.
+ */
+const FALLBACK_SBC_REGIONS = [
+  { uri: 'sbcind.telecmi.com', label: 'India' },
+  { uri: 'sbcus.telecmi.com', label: 'America' },
+  { uri: 'sbcuk.telecmi.com', label: 'Europe' },
+  { uri: 'sbcsg.telecmi.com', label: 'Asia (Singapore)' },
+];
+
+const DEFAULT_SBC_URI = 'sbcind.telecmi.com';
+
 const EMPTY: FormState = {
   enabled: false,
   recordCalls: true,
   appId: '',
-  sbcUri: '',
+  sbcUri: DEFAULT_SBC_URI,
   defaultCountryCode: '',
   publicServerUrl: '',
   apiToken: '',
@@ -169,7 +183,8 @@ export function TelecmiPanel() {
         enabled: data.enabled,
         recordCalls: data.recordCalls,
         appId: data.appId,
-        sbcUri: data.sbcUri,
+        // Never leave the select on a blank value — it would save an empty region.
+        sbcUri: data.sbcUri || DEFAULT_SBC_URI,
         defaultCountryCode: data.defaultCountryCode,
         publicServerUrl: data.publicServerUrl,
         apiToken: '',
@@ -278,7 +293,7 @@ export function TelecmiPanel() {
           <div>
             <Label>SBC region</Label>
             <Select value={form.sbcUri} onChange={(e) => set('sbcUri', e.target.value)}>
-              {(data?.sbcRegions ?? []).map((r) => (
+              {(data?.sbcRegions?.length ? data.sbcRegions : FALLBACK_SBC_REGIONS).map((r) => (
                 <option key={r.uri} value={r.uri}>
                   {r.label} — {r.uri}
                 </option>
