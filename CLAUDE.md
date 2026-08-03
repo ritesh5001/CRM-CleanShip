@@ -237,13 +237,20 @@ Voice URL is the panel's shown `voiceWebhookUrl` (`https://<server>/api/v1/calls
 panel's "Public server URL" (or `PUBLIC_SERVER_URL`) so recording webhooks resolve — use ngrok
 locally.
 
-## Telephony provider #2 — TeleCMI (PIOPIY)
+## Telephony provider #2 — TeleCMI
 
 TeleCMI runs **alongside** Twilio; both stay configured and each user picks which one they dial with.
 
+**Which TeleCMI product:** this targets their **cloud phone system**, administered from the **Connle**
+dashboard (`connle.telecmi.com`) — *not* PIOPIY, their separate programmable-telephony platform. The
+distinction matters: recordings come from `rest.telecmi.com/v2/play?appid=&secret=&file=` (PIOPIY uses
+`/v2/piopiy/play` with a `token`), and the CDR webhook is configured under **Settings → Webhooks** in
+Connle (PIOPIY uses a "CDR URL" field + MAP APP button). The `piopiy.telecmi.com/v1/agent*` endpoints
+are shared by both products.
+
 - **Config** (`Integration` doc `key:'telecmi'`, admin panel → `features/integrations/TelecmiPanel.tsx`):
-  `enabled, appId, apiToken (secret), sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.
-  `GET/PUT /integrations/telecmi` (secret masked as `apiTokenSet`).
+  `enabled, appId, apiSecret (secret), sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.
+  `GET/PUT /integrations/telecmi` (secret masked as `apiSecretSet`). App ID + API secret come from Connle.
 - **Per-telecaller agent:** `User.telecmiUserId` + `telecmiPassword` (both `select:false` for the
   password, also stripped in `toJSON`), assigned via `PATCH /users/:id/telecmi`. A blank password
   keeps the stored one. `User.callProvider` holds the user's preference (`PATCH /calls/provider`,
@@ -256,8 +263,9 @@ TeleCMI runs **alongside** Twilio; both stay configured and each user picks whic
   then bridges the lead. Uses an agent token from `/v1/agentLogin` (valid 30 days, cached on the User
   doc and auto-refreshed once on failure). No browser audio, so no keypad/mute/live controls.
 - **CDR webhook:** `POST /calls/telecmi/cdr` (public). TeleCMI does **not** sign its callbacks, so the
-  handler authenticates by matching the configured `appid` on the payload. Paste the panel's shown
-  `cdrWebhookUrl` into the PIOPIY dashboard's "CDR URL" + press MAP APP.
+  handler authenticates by matching the configured `appid` on the payload (the CDR carries it). Register
+  the panel's shown `cdrWebhookUrl` in Connle under **Settings → Webhooks** → pick the business number →
+  add → type **call report**, method **POST**.
 - **Recordings** are referenced by *file name* (`CallLog.recordingFile`) and streamed through the same
   `GET /calls/:id/recording` proxy, which branches on `CallLog.provider`.
 - `CallLog` carries `provider (twilio|telecmi)`, `mode (softphone|click_to_call)`, `telecmiCallId`,

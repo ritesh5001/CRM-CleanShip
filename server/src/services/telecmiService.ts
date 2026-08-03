@@ -1,5 +1,10 @@
 /**
- * TeleCMI (PIOPIY) telephony provider — the second calling backend alongside Twilio.
+ * TeleCMI telephony provider — the second calling backend alongside Twilio.
+ *
+ * This targets TeleCMI's **cloud phone system**, administered from the Connle
+ * dashboard (connle.telecmi.com) — not their separate PIOPIY programmable-telephony
+ * product. The App ID / API secret, the per-agent users and the CDR webhook all come
+ * from Connle. The `piopiy.telecmi.com` agent endpoints below are shared by both.
  *
  * Two calling modes are supported, both configured from the admin panel:
  *  - **Softphone**: the browser registers directly with a TeleCMI SBC via the
@@ -22,7 +27,10 @@ export const TELECMI_KEY = 'telecmi';
 
 const AGENT_LOGIN_URL = 'https://piopiy.telecmi.com/v1/agentLogin';
 const AGENT_CONNECT_URL = 'https://piopiy.telecmi.com/v1/agentConnect';
-const RECORDING_URL = 'https://rest.telecmi.com/v2/piopiy/play';
+// Recording playback for the TeleCMI cloud phone system (Connle dashboard).
+// NB: this is `/v2/play` with an `appid` + `secret` — not PIOPIY's `/v2/piopiy/play`
+// with a `token`, which belongs to their separate programmable-telephony product.
+const RECORDING_URL = 'https://rest.telecmi.com/v2/play';
 
 /** Agent tokens are valid 30 days; refresh a little early to avoid edge failures. */
 const TOKEN_TTL_MS = 29 * 24 * 60 * 60 * 1000;
@@ -44,7 +52,7 @@ export async function getTelecmiSettings(): Promise<IntegrationDoc | null> {
 
 /** True when a settings doc has the credentials needed for the REST API. */
 function hasAllCreds(s: IntegrationDoc): boolean {
-  return Boolean(s.appId && s.apiToken);
+  return Boolean(s.appId && s.apiSecret);
 }
 
 /** True when TeleCMI calling is switched on AND fully configured. */
@@ -167,7 +175,7 @@ export async function clickToCall(
 
 /**
  * Fetches a recorded call's audio from TeleCMI. Like the Twilio path this must be
- * proxied server-side — the app id + API token would otherwise reach the browser.
+ * proxied server-side — the app id + API secret would otherwise reach the browser.
  */
 export async function fetchRecordingMedia(
   filename: string
@@ -177,7 +185,7 @@ export async function fetchRecordingMedia(
 
   const url = new URL(RECORDING_URL);
   url.searchParams.set('appid', s.appId);
-  url.searchParams.set('token', s.apiToken);
+  url.searchParams.set('secret', s.apiSecret);
   url.searchParams.set('file', filename);
 
   const resp = await fetch(url);

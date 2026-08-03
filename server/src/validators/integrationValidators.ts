@@ -22,11 +22,11 @@ export const updateTwilioSchema = z.object({
 export type UpdateTwilioInput = z.infer<typeof updateTwilioSchema>;
 
 // TeleCMI (PIOPIY) settings. Same convention as Twilio: everything optional for
-// partial updates, and a blank `apiToken` means "keep the existing secret".
+// partial updates, and a blank `apiSecret` means "keep the existing secret".
 export const updateTelecmiSchema = z.object({
   enabled: z.boolean().optional(),
   appId: z.string().trim().optional(),
-  apiToken: z.string().trim().optional(),
+  apiSecret: z.string().trim().optional(),
   sbcUri: z.string().trim().optional(),
   recordCalls: z.boolean().optional(),
   publicServerUrl: z.string().trim().optional(),

@@ -19,7 +19,7 @@ interface FormState {
   sbcUri: string;
   defaultCountryCode: string;
   publicServerUrl: string;
-  apiToken: string;
+  apiSecret: string;
 }
 
 /**
@@ -43,7 +43,7 @@ const EMPTY: FormState = {
   sbcUri: DEFAULT_SBC_URI,
   defaultCountryCode: '',
   publicServerUrl: '',
-  apiToken: '',
+  apiSecret: '',
 };
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -171,7 +171,11 @@ function AgentAssignmentCard() {
   );
 }
 
-/** Admin panel for the TeleCMI (PIOPIY) calling backend. */
+/**
+ * Admin panel for the TeleCMI calling backend — the cloud phone system managed
+ * from the Connle dashboard (connle.telecmi.com), where the App ID, API secret and
+ * per-agent users all come from.
+ */
 export function TelecmiPanel() {
   const { data, isLoading } = useTelecmiIntegration();
   const update = useUpdateTelecmiIntegration();
@@ -187,7 +191,7 @@ export function TelecmiPanel() {
         sbcUri: data.sbcUri || DEFAULT_SBC_URI,
         defaultCountryCode: data.defaultCountryCode,
         publicServerUrl: data.publicServerUrl,
-        apiToken: '',
+        apiSecret: '',
       });
     }
   }, [data]);
@@ -206,10 +210,10 @@ export function TelecmiPanel() {
       publicServerUrl: form.publicServerUrl,
     };
     // Blank secret = keep the stored one.
-    if (form.apiToken) payload.apiToken = form.apiToken;
+    if (form.apiSecret) payload.apiSecret = form.apiSecret;
     try {
       await update.mutateAsync(payload);
-      setForm((f) => ({ ...f, apiToken: '' }));
+      setForm((f) => ({ ...f, apiSecret: '' }));
       toast.success('TeleCMI settings saved');
     } catch (e) {
       toast.error(apiError(e));
@@ -282,12 +286,12 @@ export function TelecmiPanel() {
             <Input value={form.appId} onChange={(e) => set('appId', e.target.value)} placeholder="1111113" />
           </div>
           <div>
-            <Label>API token {data?.apiTokenSet && <span className="text-emerald-600">(saved)</span>}</Label>
+            <Label>API secret {data?.apiSecretSet && <span className="text-emerald-600">(saved)</span>}</Label>
             <Input
               type="password"
-              value={form.apiToken}
-              onChange={(e) => set('apiToken', e.target.value)}
-              placeholder={data?.apiTokenSet ? 'Leave blank to keep current' : 'xxxx-xxxx-xxxx-xxxx'}
+              value={form.apiSecret}
+              onChange={(e) => set('apiSecret', e.target.value)}
+              placeholder={data?.apiSecretSet ? 'Leave blank to keep current' : 'xx-xx'}
             />
           </div>
           <div>
@@ -322,8 +326,9 @@ export function TelecmiPanel() {
         <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
           <Label>CDR webhook URL</Label>
           <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-            Paste this into the PIOPIY dashboard’s “CDR URL”, then press MAP APP — call records and recordings
-            arrive here when a call ends.
+            In the TeleCMI dashboard (Connle) go to <strong>Settings → Webhooks</strong>, pick your business
+            number, click add, set the type to <strong>call report</strong> and the method to <strong>POST</strong>,
+            then paste this URL. Call records and recordings arrive here when a call ends.
           </p>
           <div className="flex items-center gap-2">
             <Input readOnly value={data?.cdrWebhookUrl || 'Set a public server URL first'} />

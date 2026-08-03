@@ -81,13 +81,13 @@ function sanitizeTelecmi(doc: IntegrationDoc | null) {
   const base = (doc?.publicServerUrl || env.publicUrl || '').replace(/\/$/, '');
   return {
     enabled: doc?.enabled ?? false,
-    configured: Boolean(doc?.appId && doc?.apiToken),
+    configured: Boolean(doc?.appId && doc?.apiSecret),
     appId: doc?.appId ?? '',
     sbcUri: doc?.sbcUri || DEFAULT_SBC_URI,
     recordCalls: doc?.recordCalls ?? true,
     defaultCountryCode: doc?.defaultCountryCode ?? '',
     publicServerUrl: doc?.publicServerUrl ?? '',
-    apiTokenSet: Boolean(doc?.apiToken),
+    apiSecretSet: Boolean(doc?.apiSecret),
     sbcRegions: SBC_REGIONS,
     // Paste this into the PIOPIY dashboard's "CDR URL" so call records reach us.
     cdrWebhookUrl: base ? `${base}/api/v1/calls/telecmi/cdr` : '',
@@ -101,7 +101,7 @@ export const getTelecmiIntegration = asyncHandler(async (_req: Request, res: Res
 });
 
 // PUT /integrations/telecmi (superadmin) — upsert TeleCMI settings. Non-secret
-// fields always overwrite; a blank `apiToken` keeps the stored one.
+// fields always overwrite; a blank `apiSecret` keeps the stored one.
 export const updateTelecmiIntegration = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as UpdateTelecmiInput;
   const doc = (await Integration.findOne({ key: TELECMI_KEY })) ?? new Integration({ key: TELECMI_KEY });
@@ -117,7 +117,7 @@ export const updateTelecmiIntegration = asyncHandler(async (req: Request, res: R
   for (const field of plainFields) {
     if (body[field] !== undefined) doc.set(field, body[field]);
   }
-  if (body.apiToken) doc.set('apiToken', body.apiToken);
+  if (body.apiSecret) doc.set('apiSecret', body.apiSecret);
 
   doc.updatedBy = req.user!.id as unknown as IntegrationDoc['updatedBy'];
   await doc.save();

@@ -68,7 +68,7 @@ export interface TelecmiIntegration {
   recordCalls: boolean;
   defaultCountryCode: string;
   publicServerUrl: string;
-  apiTokenSet: boolean;
+  apiSecretSet: boolean;
   sbcRegions: { uri: string; label: string }[];
   /** Paste into the PIOPIY dashboard's "CDR URL" so call records reach us. */
   cdrWebhookUrl: string;
@@ -77,7 +77,7 @@ export interface TelecmiIntegration {
 export interface TelecmiIntegrationUpdate {
   enabled?: boolean;
   appId?: string;
-  apiToken?: string;
+  apiSecret?: string;
   sbcUri?: string;
   recordCalls?: boolean;
   defaultCountryCode?: string;
