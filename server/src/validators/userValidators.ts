@@ -26,6 +26,13 @@ export const setTargetSchema = z.object({
   dailyTarget: z.number().int().min(0),
 });
 
+// Assign a TeleCMI agent to a telecaller. An empty `telecmiUserId` unassigns them;
+// a blank password keeps whatever is already stored.
+export const setTelecmiAgentSchema = z.object({
+  telecmiUserId: z.string().trim().default(''),
+  telecmiPassword: z.string().trim().optional(),
+});
+
 export const setTwilioNumberSchema = z.object({
   // E.164 (e.g. +14155551234), or empty string to unassign.
   twilioNumber: z

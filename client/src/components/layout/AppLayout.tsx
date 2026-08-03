@@ -4,7 +4,7 @@ import { LogOut, Phone, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
 import { useWorkspaceStore } from '@/store/workspace';
-import { useCallConfig } from '@/api/calls';
+import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useCallStore } from '@/store/call';
 import { CallBar } from '@/features/calls/CallBar';
 import { CallDispositionModal } from '@/features/calls/CallDispositionModal';
@@ -14,7 +14,7 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
-  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const callingEnabled = useCallProvider().ready;
   const initDevice = useCallStore((s) => s.initDevice);
 
   // Warm up the Twilio softphone once we know calling is configured (no mic

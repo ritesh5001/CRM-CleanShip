@@ -16,7 +16,7 @@ import { Label, Select } from '@/components/ui/Field';
 import { Badge, Card } from '@/components/ui/Misc';
 import { useAudioStore } from '@/store/audio';
 import { useCallStore } from '@/store/call';
-import { useCallConfig } from '@/api/calls';
+import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useMicRecorder, useMicTest } from '@/features/devices/useMicTest';
 
 type Status = 'ok' | 'warn' | 'bad' | 'idle';
@@ -81,7 +81,7 @@ export function DeviceTestPage() {
   const { recording, clipUrl, error: recError, startRecording, stopRecording } = useMicRecorder();
 
   const softphoneReady = useCallStore((s) => s.ready);
-  const callingEnabled = useCallConfig().data?.enabled ?? false;
+  const callingEnabled = useCallProvider().ready;
   const playbackRef = useRef<HTMLAudioElement>(null);
   const [checkedPermission, setCheckedPermission] = useState(false);
 

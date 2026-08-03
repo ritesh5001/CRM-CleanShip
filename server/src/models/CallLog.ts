@@ -1,4 +1,5 @@
 import { Schema, model, Types, type InferSchemaType, type HydratedDocument } from 'mongoose';
+import { CALL_PROVIDERS } from './User.js';
 
 export type Disposition =
   | 'interested'
@@ -49,8 +50,16 @@ const callLogSchema = new Schema(
     // Which of the contact's numbers was dialled, and the actual number string.
     phone: { type: String, enum: ['phone1', 'phone2', 'phone3'], default: 'phone1' },
     phoneNumber: { type: String, default: '' },
+    // Which telephony backend placed the call, and how.
+    provider: { type: String, enum: CALL_PROVIDERS, default: 'twilio' },
+    mode: { type: String, enum: ['softphone', 'click_to_call'], default: 'softphone' },
     // Twilio call correlation (set when the call was placed via the browser softphone).
     twilioCallSid: { type: String, index: true },
+    // TeleCMI correlation: the SDK/CDR call id, and the click-to-call request id.
+    telecmiCallId: { type: String, index: true },
+    telecmiRequestId: { type: String, index: true },
+    // TeleCMI recordings are referenced by file name and streamed through our proxy.
+    recordingFile: { type: String },
     recordingUrl: { type: String },
     workspace: { type: Types.ObjectId, ref: 'Workspace', required: true, index: true },
   },

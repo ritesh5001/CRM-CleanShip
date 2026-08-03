@@ -95,6 +95,33 @@ export const setUserTwilioNumber = asyncHandler(async (req: Request, res: Respon
   res.json({ success: true, user });
 });
 
+// PATCH /users/:id/telecmi — assign (or clear) this telecaller's TeleCMI agent.
+// Changing the credentials invalidates any cached click-to-call token so the next
+// call re-authenticates instead of using a token minted for the old agent.
+export const setUserTelecmi = asyncHandler(async (req: Request, res: Response) => {
+  const { telecmiUserId, telecmiPassword } = req.body as {
+    telecmiUserId: string;
+    telecmiPassword?: string;
+  };
+
+  const user = await User.findOne({ _id: req.params.id, role: 'telecaller', workspace: req.workspaceId });
+  if (!user) throw ApiError.notFound('Telecaller not found');
+
+  user.telecmiUserId = telecmiUserId;
+  // A blank password means "keep the stored one" — except when the agent id is
+  // cleared, which unassigns the agent entirely.
+  if (!telecmiUserId) {
+    user.telecmiPassword = '';
+  } else if (telecmiPassword) {
+    user.telecmiPassword = telecmiPassword;
+  }
+  user.telecmiAgentToken = '';
+  user.telecmiTokenAt = undefined;
+  await user.save();
+
+  res.json({ success: true, user });
+});
+
 export const resetUserPassword = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ _id: req.params.id, role: 'telecaller', workspace: req.workspaceId }).select('+passwordHash');
   if (!user) throw ApiError.notFound('Telecaller not found');

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Phone, MessageCircle, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useFollowUps, useMarkFollowUpDone } from '@/api/followups';
-import { useCallConfig } from '@/api/calls';
+import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useCallStore } from '@/store/call';
 import { Button } from '@/components/ui/Button';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/Misc';
@@ -23,9 +23,11 @@ export function FollowUpsPage() {
   const [scope, setScope] = useState('today');
   const { data, isLoading } = useFollowUps({ scope });
   const markDone = useMarkFollowUpDone();
-  const callConfig = useCallConfig().data;
-  const callingEnabled = callConfig?.enabled ?? false;
-  const needsCallerId = (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
+  const { config: callConfig, ready: callingEnabled, provider: callProvider } = useCallProvider();
+  const needsCallerId =
+    callProvider === 'telecmi'
+      ? (callConfig?.providers?.telecmi?.configured ?? false) && !(callConfig?.providers?.telecmi?.hasAgent ?? false)
+      : (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
   const startCall = useCallStore((s) => s.startCall);
   const callPhase = useCallStore((s) => s.phase);
   const callBusy = callPhase === 'connecting' || callPhase === 'ringing' || callPhase === 'in_call';

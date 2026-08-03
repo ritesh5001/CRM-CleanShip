@@ -3,7 +3,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { env } from '../config/env.js';
 import { Integration, type IntegrationDoc } from '../models/Integration.js';
 import { TWILIO_KEY, listNumbers } from '../services/twilioService.js';
-import type { UpdateTwilioInput } from '../validators/integrationValidators.js';
+import { TELECMI_KEY, DEFAULT_SBC_URI, SBC_REGIONS } from '../services/telecmiService.js';
+import type { UpdateTwilioInput, UpdateTelecmiInput } from '../validators/integrationValidators.js';
 
 // Fields the admin form sends that are kept secret: blanks mean "leave unchanged",
 // and we never echo their values back to the client.
@@ -73,4 +74,53 @@ export const updateTwilioIntegration = asyncHandler(async (req: Request, res: Re
 export const listTwilioNumbers = asyncHandler(async (_req: Request, res: Response) => {
   const numbers = await listNumbers();
   res.json({ success: true, data: numbers });
+});
+
+/** Client-safe view of the TeleCMI settings — the API token reduced to a "set" flag. */
+function sanitizeTelecmi(doc: IntegrationDoc | null) {
+  const base = (doc?.publicServerUrl || env.publicUrl || '').replace(/\/$/, '');
+  return {
+    enabled: doc?.enabled ?? false,
+    configured: Boolean(doc?.appId && doc?.apiToken),
+    appId: doc?.appId ?? '',
+    sbcUri: doc?.sbcUri || DEFAULT_SBC_URI,
+    recordCalls: doc?.recordCalls ?? true,
+    defaultCountryCode: doc?.defaultCountryCode ?? '',
+    publicServerUrl: doc?.publicServerUrl ?? '',
+    apiTokenSet: Boolean(doc?.apiToken),
+    sbcRegions: SBC_REGIONS,
+    // Paste this into the PIOPIY dashboard's "CDR URL" so call records reach us.
+    cdrWebhookUrl: base ? `${base}/api/v1/calls/telecmi/cdr` : '',
+  };
+}
+
+// GET /integrations/telecmi (superadmin) — current TeleCMI settings, secret masked.
+export const getTelecmiIntegration = asyncHandler(async (_req: Request, res: Response) => {
+  const doc = await Integration.findOne({ key: TELECMI_KEY });
+  res.json({ success: true, data: sanitizeTelecmi(doc) });
+});
+
+// PUT /integrations/telecmi (superadmin) — upsert TeleCMI settings. Non-secret
+// fields always overwrite; a blank `apiToken` keeps the stored one.
+export const updateTelecmiIntegration = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as UpdateTelecmiInput;
+  const doc = (await Integration.findOne({ key: TELECMI_KEY })) ?? new Integration({ key: TELECMI_KEY });
+
+  const plainFields = [
+    'enabled',
+    'appId',
+    'sbcUri',
+    'recordCalls',
+    'defaultCountryCode',
+    'publicServerUrl',
+  ] as const;
+  for (const field of plainFields) {
+    if (body[field] !== undefined) doc.set(field, body[field]);
+  }
+  if (body.apiToken) doc.set('apiToken', body.apiToken);
+
+  doc.updatedBy = req.user!.id as unknown as IntegrationDoc['updatedBy'];
+  await doc.save();
+
+  res.json({ success: true, data: sanitizeTelecmi(doc) });
 });

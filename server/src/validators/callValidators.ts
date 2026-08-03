@@ -1,5 +1,19 @@
 import { z } from 'zod';
 import { DISPOSITIONS } from '../models/CallLog.js';
+import { CALL_PROVIDERS } from '../models/User.js';
+
+/** POST /calls/telecmi/click-to-call — ring the telecaller, then bridge the lead. */
+export const clickToCallSchema = z.object({
+  to: z.string().trim().min(1, 'A number to call is required'),
+  lead: z.string().min(1).optional(),
+});
+
+export type ClickToCallInput = z.infer<typeof clickToCallSchema>;
+
+/** PATCH /calls/provider — the caller's preferred telephony backend. */
+export const setCallProviderSchema = z.object({
+  provider: z.enum(CALL_PROVIDERS),
+});
 
 export const logCallSchema = z
   .object({
@@ -12,6 +26,11 @@ export const logCallSchema = z
     durationSec: z.number().int().min(0).optional().default(0),
     nextFollowUpAt: z.coerce.date().optional(),
     twilioCallSid: z.string().optional(),
+    // TeleCMI equivalents of twilioCallSid, plus which backend placed the call.
+    provider: z.enum(CALL_PROVIDERS).optional().default('twilio'),
+    mode: z.enum(['softphone', 'click_to_call']).optional().default('softphone'),
+    telecmiCallId: z.string().optional(),
+    telecmiRequestId: z.string().optional(),
     phone: z.enum(['phone1', 'phone2', 'phone3']).optional().default('phone1'),
     phoneNumber: z.string().optional().default(''),
   })

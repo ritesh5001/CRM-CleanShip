@@ -15,6 +15,13 @@ const integrationSchema = new Schema(
     apiKeySecret: { type: String, default: '' }, // secret
     twimlAppSid: { type: String, default: '' },
     callerId: { type: String, default: '' },
+    // TeleCMI (PIOPIY) credentials — used when `key` is 'telecmi'.
+    // `appId` + `apiToken` authenticate the REST API (recording playback); the
+    // per-agent SIP user/password live on the User doc, not here.
+    appId: { type: String, default: '' },
+    apiToken: { type: String, default: '' }, // secret
+    // Regional SBC the browser softphone registers against, e.g. 'sbcind.telecmi.com'.
+    sbcUri: { type: String, default: '' },
     // Call behaviour.
     recordCalls: { type: Boolean, default: true },
     // Prepended to dialled numbers that have no country code (e.g. '+91').

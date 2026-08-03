@@ -12,6 +12,7 @@ import { apiError } from '@/api/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label, Select } from '@/components/ui/Field';
 import { Badge, Card, Spinner } from '@/components/ui/Misc';
+import { TelecmiPanel } from '@/features/integrations/TelecmiPanel';
 
 interface FormState {
   enabled: boolean;
@@ -358,6 +359,8 @@ export function IntegrationsPage() {
       </Card>
 
       <NumberAssignmentCard configured={data?.configured ?? false} />
+
+      <TelecmiPanel />
     </div>
   );
 }

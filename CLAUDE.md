@@ -237,6 +237,34 @@ Voice URL is the panel's shown `voiceWebhookUrl` (`https://<server>/api/v1/calls
 panel's "Public server URL" (or `PUBLIC_SERVER_URL`) so recording webhooks resolve — use ngrok
 locally.
 
+## Telephony provider #2 — TeleCMI (PIOPIY)
+
+TeleCMI runs **alongside** Twilio; both stay configured and each user picks which one they dial with.
+
+- **Config** (`Integration` doc `key:'telecmi'`, admin panel → `features/integrations/TelecmiPanel.tsx`):
+  `enabled, appId, apiToken (secret), sbcUri, recordCalls, defaultCountryCode, publicServerUrl`.
+  `GET/PUT /integrations/telecmi` (secret masked as `apiTokenSet`).
+- **Per-telecaller agent:** `User.telecmiUserId` + `telecmiPassword` (both `select:false` for the
+  password, also stripped in `toJSON`), assigned via `PATCH /users/:id/telecmi`. A blank password
+  keeps the stored one. `User.callProvider` holds the user's preference (`PATCH /calls/provider`,
+  self-service — telecallers set their own).
+- **Softphone (WebRTC):** `@telecmi/piopiyjs`. Unlike Twilio there is **no server-minted token and no
+  TwiML webhook** — the browser registers with the regional SBC using the agent's SIP password, which
+  `GET /calls/telecmi/credentials` hands to that user only (scoped to `req.user`).
+  SBCs: `sbcind`/`sbcus`/`sbcuk`/`sbcsg`.
+- **Click-to-call:** `POST /calls/telecmi/click-to-call` → TeleCMI rings the telecaller's own phone,
+  then bridges the lead. Uses an agent token from `/v1/agentLogin` (valid 30 days, cached on the User
+  doc and auto-refreshed once on failure). No browser audio, so no keypad/mute/live controls.
+- **CDR webhook:** `POST /calls/telecmi/cdr` (public). TeleCMI does **not** sign its callbacks, so the
+  handler authenticates by matching the configured `appid` on the payload. Paste the panel's shown
+  `cdrWebhookUrl` into the PIOPIY dashboard's "CDR URL" + press MAP APP.
+- **Recordings** are referenced by *file name* (`CallLog.recordingFile`) and streamed through the same
+  `GET /calls/:id/recording` proxy, which branches on `CallLog.provider`.
+- `CallLog` carries `provider (twilio|telecmi)`, `mode (softphone|click_to_call)`, `telecmiCallId`,
+  `telecmiRequestId`. Client state lives in the same `store/call.ts`, which branches per provider;
+  `features/calls/useCallProvider.ts` is the single source of truth for "which backend am I on" and
+  `ProviderSwitcher.tsx` is the UI.
+
 ## Dialer, DTMF & custom calls
 
 - **Dialer** (`pages/DialerPage.tsx`, `/dialer`, both roles) places a call to any number that isn't a

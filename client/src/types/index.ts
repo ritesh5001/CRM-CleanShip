@@ -1,5 +1,8 @@
 export type Role = 'superadmin' | 'telecaller';
 
+/** Telephony backends a call can be placed through. */
+export type CallProvider = 'twilio' | 'telecmi';
+
 export type Density = 'comfortable' | 'compact';
 
 export interface Workspace {
@@ -20,6 +23,10 @@ export interface User {
   isActive: boolean;
   dailyTarget: number;
   twilioNumber?: string;
+  /** TeleCMI agent id assigned by the admin ('' when none). The password never leaves the server. */
+  telecmiUserId?: string;
+  /** Which provider this user prefers to dial with. */
+  callProvider?: CallProvider;
   // The workspace a telecaller belongs to (absent for the superadmin).
   workspace?: string;
   lastLoginAt?: string;
@@ -127,6 +134,13 @@ export interface CallLog {
   nextFollowUpAt?: string;
   twilioCallSid?: string;
   recordingUrl?: string;
+  /** Which telephony backend placed this call, and how. */
+  provider?: CallProvider;
+  mode?: 'softphone' | 'click_to_call';
+  telecmiCallId?: string;
+  telecmiRequestId?: string;
+  /** TeleCMI recordings are referenced by file name, streamed via our proxy. */
+  recordingFile?: string;
   phone?: 'phone1' | 'phone2' | 'phone3';
   phoneNumber?: string;
   createdAt: string;

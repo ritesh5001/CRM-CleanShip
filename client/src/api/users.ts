@@ -67,6 +67,30 @@ export function useDeleteTelecaller() {
   });
 }
 
+/**
+ * Assign (or clear, with an empty id) the TeleCMI agent a telecaller dials as.
+ * A blank password keeps whatever is already stored, so the admin only has to
+ * retype it when it actually changes.
+ */
+export function useSetTelecallerTelecmi() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      telecmiUserId,
+      telecmiPassword,
+    }: {
+      id: string;
+      telecmiUserId: string;
+      telecmiPassword?: string;
+    }) => (await api.patch(`/users/${id}/telecmi`, { telecmiUserId, telecmiPassword })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['call-config'] });
+    },
+  });
+}
+
 /** Assign (or clear, with '') the Twilio caller-ID number a telecaller dials from. */
 export function useSetTelecallerTwilioNumber() {
   const qc = useQueryClient();

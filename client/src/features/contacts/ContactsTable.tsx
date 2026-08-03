@@ -24,7 +24,7 @@ import { Badge, EmptyState, Spinner } from '@/components/ui/Misc';
 import { Button } from '@/components/ui/Button';
 import { apiError } from '@/api/client';
 import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead, useUpdatePhoneOutcome } from '@/api/leads';
-import { useCallConfig } from '@/api/calls';
+import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useCallStore } from '@/store/call';
 import { CallHistory } from '@/features/calls/CallHistory';
 import {
@@ -136,9 +136,12 @@ function FollowUpCell({ lead }: { lead: Lead }) {
 function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; lead?: Lead; slot?: PhoneSlot; big?: boolean }) {
   const size = big ? 16 : 15;
   const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
-  const callConfig = useCallConfig().data;
-  const callingEnabled = callConfig?.enabled ?? false;
-  const needsCallerId = (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
+  const { config: callConfig, ready: callingEnabled, provider: callProvider } = useCallProvider();
+  // "Configured but no number/agent assigned to you" — a gap an admin can fix.
+  const needsCallerId =
+    callProvider === 'telecmi'
+      ? (callConfig?.providers?.telecmi?.configured ?? false) && !(callConfig?.providers?.telecmi?.hasAgent ?? false)
+      : (callConfig?.configured ?? false) && !(callConfig?.hasCallerId ?? false);
   const startCall = useCallStore((s) => s.startCall);
   const phase = useCallStore((s) => s.phase);
   const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';

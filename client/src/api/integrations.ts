@@ -59,6 +59,53 @@ export function useTwilioIntegration() {
   });
 }
 
+/** Client-safe TeleCMI settings (the API token reduced to a `*Set` flag). */
+export interface TelecmiIntegration {
+  enabled: boolean;
+  configured: boolean;
+  appId: string;
+  sbcUri: string;
+  recordCalls: boolean;
+  defaultCountryCode: string;
+  publicServerUrl: string;
+  apiTokenSet: boolean;
+  sbcRegions: { uri: string; label: string }[];
+  /** Paste into the PIOPIY dashboard's "CDR URL" so call records reach us. */
+  cdrWebhookUrl: string;
+}
+
+export interface TelecmiIntegrationUpdate {
+  enabled?: boolean;
+  appId?: string;
+  apiToken?: string;
+  sbcUri?: string;
+  recordCalls?: boolean;
+  defaultCountryCode?: string;
+  publicServerUrl?: string;
+}
+
+export function useTelecmiIntegration() {
+  return useQuery({
+    queryKey: ['telecmi-integration'],
+    queryFn: async () => {
+      const { data } = await api.get<{ success: boolean; data: TelecmiIntegration }>('/integrations/telecmi');
+      return data.data;
+    },
+  });
+}
+
+export function useUpdateTelecmiIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: TelecmiIntegrationUpdate) =>
+      (await api.put<{ success: boolean; data: TelecmiIntegration }>('/integrations/telecmi', payload)).data.data,
+    onSuccess: (data) => {
+      qc.setQueryData(['telecmi-integration'], data);
+      qc.invalidateQueries({ queryKey: ['call-config'] });
+    },
+  });
+}
+
 export function useUpdateTwilioIntegration() {
   const qc = useQueryClient();
   return useMutation({

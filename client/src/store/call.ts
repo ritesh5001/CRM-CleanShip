@@ -1,9 +1,17 @@
 import { create } from 'zustand';
 import { Call, Device } from '@twilio/voice-sdk';
+import PIOPIY from '@telecmi/piopiyjs';
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { fetchVoiceToken, fetchDialStatus, type DialResult } from '@/api/calls';
+import {
+  fetchVoiceToken,
+  fetchDialStatus,
+  fetchTelecmiCredentials,
+  startClickToCall,
+  type DialResult,
+} from '@/api/calls';
 import { cleanPhone } from '@/lib/format';
 import { useAudioStore } from '@/store/audio';
+import type { CallProvider } from '@/types';
 
 /**
  * Point the Twilio Device at the mic/speaker chosen on the Device Test page.
@@ -37,6 +45,8 @@ async function applyAudioDevices(device: Device) {
 
 export type CallPhase = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended';
 export type PhoneSlot = 'phone1' | 'phone2' | 'phone3';
+/** How the call is placed: through the browser, or by TeleCMI ringing the user's phone. */
+export type CallMode = 'softphone' | 'click_to_call';
 
 /** Summary of a just-ended call, used to seed the disposition modal. */
 export interface PendingDisposition {
@@ -47,6 +57,11 @@ export interface PendingDisposition {
   phoneSlot: PhoneSlot; // which of the contact's numbers (phone1/2/3)
   durationSec: number;
   twilioCallSid?: string;
+  /** Which backend placed the call, so the outcome is logged against it. */
+  provider: CallProvider;
+  mode: CallMode;
+  telecmiCallId?: string;
+  telecmiRequestId?: string;
   dialStatus?: string; // completed | busy | no-answer | failed | canceled
   resultReason?: string; // human-readable reason shown to the user
 }
@@ -96,8 +111,34 @@ function friendlyDeviceError(e: { code?: number; message?: string }): string {
   }
 }
 
+/** Maps TeleCMI SDK status codes onto a clear message for the telecaller. */
+function friendlyPiopiyError(e: { code?: number; status?: string }): string {
+  switch (e.code) {
+    case 401:
+      return 'TeleCMI login failed. Ask your admin to check your agent id and password.';
+    case 480:
+      return 'The number is unavailable.';
+    case 486:
+      return 'The line was busy.';
+    case 404:
+      return 'Invalid number — TeleCMI could not reach it. Please update it.';
+    case 408:
+      return 'No answer.';
+    case 1001:
+    case 1002:
+      return e.status || 'Calling error. Please try again.';
+    default:
+      return e.status || 'Call error. Please try again.';
+  }
+}
+
 interface CallState {
+  /** Which backend the *current* session dials with, and in which mode. */
+  provider: CallProvider;
+  mode: CallMode;
   device: Device | null;
+  /** The TeleCMI softphone, created lazily and kept registered with the SBC. */
+  piopiy: PIOPIY | null;
   ready: boolean;
   initializing: boolean;
   call: Call | null;
@@ -113,7 +154,9 @@ interface CallState {
   /** DTMF digits sent during this call, e.g. "1" then "3" → "13". For the UI. */
   digitsSent: string;
 
-  /** Lazily create the Twilio Device (idempotent). Safe to call repeatedly. */
+  /** Switch backend/mode. Tears down the old device so the next call re-registers. */
+  setProvider: (provider: CallProvider, mode?: CallMode) => void;
+  /** Lazily create the softphone for the active provider (idempotent). */
   initDevice: () => Promise<void>;
   startCall: (lead: {
     leadId: string | null;
@@ -131,7 +174,10 @@ interface CallState {
 }
 
 export const useCallStore = create<CallState>((set, get) => ({
+  provider: 'twilio',
+  mode: 'softphone',
   device: null,
+  piopiy: null,
   ready: false,
   initializing: false,
   call: null,
@@ -146,9 +192,93 @@ export const useCallStore = create<CallState>((set, get) => ({
   pending: null,
   digitsSent: '',
 
+  setProvider: (provider, mode = 'softphone') => {
+    if (get().provider === provider && get().mode === mode) return;
+    // Drop the old provider's registration so the next call initialises cleanly.
+    get().destroy();
+    set({ provider, mode, error: null });
+  },
+
   initDevice: async () => {
-    const { device, initializing } = get();
-    if (device || initializing) return;
+    const { initializing, provider, mode } = get();
+    if (initializing) return;
+    // Click-to-call places the call server-side — there is no device to register.
+    if (provider === 'telecmi' && mode === 'click_to_call') {
+      set({ ready: true });
+      return;
+    }
+    if (provider === 'telecmi') {
+      if (get().piopiy) return;
+      set({ initializing: true, error: null });
+      try {
+        const creds = await fetchTelecmiCredentials();
+        const phone = new PIOPIY({ name: 'CleanShip CRM', debug: false, autoplay: true, ringTime: 60 });
+
+        // Registration is asynchronous — resolve once the SBC accepts the login so
+        // a call placed straight after init isn't dialled on an unregistered device.
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('TeleCMI login timed out. Check your connection.')), 15000);
+          phone.on('login', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+          phone.on('loginFailed', (e) => {
+            clearTimeout(timer);
+            reject(new Error(friendlyPiopiyError(e)));
+          });
+          phone.login(creds.userId, creds.password, creds.sbcUri);
+        });
+
+        phone.on('error', (e) => set({ error: friendlyPiopiyError(e) }));
+        phone.on('mediaFailed', () => set({ error: 'Microphone permission denied. Allow mic access and try again.' }));
+
+        // Call lifecycle — bound once for the life of the device, reading the
+        // current lead/number straight from the store each time.
+        phone.on('trying', () => set({ phase: 'connecting' }));
+        phone.on('ringing', () => set({ phase: 'ringing' }));
+        phone.on('answered', () => set({ phase: 'in_call', startedAt: Date.now() }));
+
+        const finish = () => {
+          // Ignore stray end events when no call of ours is in flight.
+          if (get().phase === 'idle' || get().phase === 'ended') return;
+          const { startedAt, leadId, leadName, phone: ph, phoneSlot } = get();
+          const durationSec = startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : 0;
+          const callId = phone.getCallId();
+          set({
+            phase: 'ended',
+            startedAt: null,
+            muted: false,
+            pending: {
+              leadId,
+              leadName,
+              phone: ph,
+              phoneSlot,
+              durationSec,
+              provider: 'telecmi',
+              mode: 'softphone',
+              telecmiCallId: callId || undefined,
+            },
+          });
+        };
+        phone.on('ended', (e) => {
+          // A call that never connected carries the reason in its end status.
+          if (!get().startedAt && e?.code && e.code !== 200) set({ error: friendlyPiopiyError(e) });
+          finish();
+        });
+        phone.on('hangup', finish);
+
+        set({ piopiy: phone, ready: true, initializing: false });
+      } catch (e) {
+        set({
+          initializing: false,
+          ready: false,
+          error: e instanceof Error ? e.message : 'Failed to initialize TeleCMI calling',
+        });
+      }
+      return;
+    }
+
+    if (get().device) return;
     set({ initializing: true, error: null });
     try {
       const token = await fetchVoiceToken();
@@ -187,16 +317,12 @@ export const useCallStore = create<CallState>((set, get) => ({
       return;
     }
 
+    const { provider, mode } = get();
+
     await get().initDevice();
-    const device = get().device;
-    if (!device) {
-      set({ error: 'Calling is unavailable' });
-      return;
-    }
-    // Honour a mic/speaker change made since the Device was created.
-    await applyAudioDevices(device);
-    set({
-      phase: 'connecting',
+
+    const baseCallState = {
+      phase: 'connecting' as CallPhase,
       leadId,
       leadName: name,
       phone: to,
@@ -206,7 +332,67 @@ export const useCallStore = create<CallState>((set, get) => ({
       error: null,
       pending: null,
       digitsSent: '',
-    });
+    };
+
+    // ── TeleCMI click-to-call: the call happens on the telecaller's own phone, so
+    // there is nothing to observe in the browser. Fire it, then hand straight to
+    // the disposition step so the outcome is still captured.
+    if (provider === 'telecmi' && mode === 'click_to_call') {
+      set(baseCallState);
+      try {
+        const requestId = await startClickToCall(to, leadId);
+        set({
+          phase: 'ended',
+          pending: {
+            leadId,
+            leadName: name,
+            phone: to,
+            phoneSlot,
+            durationSec: 0,
+            provider: 'telecmi',
+            mode: 'click_to_call',
+            telecmiRequestId: requestId,
+          },
+        });
+      } catch (e) {
+        set({
+          phase: 'idle',
+          error: e instanceof Error ? e.message : 'Could not place the call through TeleCMI',
+        });
+      }
+      return;
+    }
+
+    // ── TeleCMI softphone (WebRTC).
+    if (provider === 'telecmi') {
+      const phone = get().piopiy;
+      if (!phone) {
+        set({ error: get().error ?? 'TeleCMI calling is unavailable' });
+        return;
+      }
+      set(baseCallState);
+      try {
+        // Lifecycle handlers are bound once in initDevice — binding them here would
+        // stack a fresh set on every call and fire `finish` N times.
+        phone.call(to, leadId ? { extra_param: leadId } : undefined);
+      } catch (e) {
+        set({
+          phase: 'idle',
+          error: e instanceof Error ? e.message : 'Could not place the call',
+        });
+      }
+      return;
+    }
+
+    // ── Twilio softphone.
+    const device = get().device;
+    if (!device) {
+      set({ error: 'Calling is unavailable' });
+      return;
+    }
+    // Honour a mic/speaker change made since the Device was created.
+    await applyAudioDevices(device);
+    set(baseCallState);
 
     let callSid: string | undefined;
     try {
@@ -226,7 +412,16 @@ export const useCallStore = create<CallState>((set, get) => ({
           startedAt: null,
           muted: false,
           // A custom dial has no leadId but still needs its outcome captured.
-          pending: { leadId: lid, leadName: lname, phone: ph, phoneSlot: slot, durationSec, twilioCallSid: callSid },
+          pending: {
+            leadId: lid,
+            leadName: lname,
+            phone: ph,
+            phoneSlot: slot,
+            durationSec,
+            twilioCallSid: callSid,
+            provider: 'twilio',
+            mode: 'softphone',
+          },
         });
         // The call never connected (no talk time) → find out why from Twilio's dial result.
         if (callSid && durationSec === 0) void get().pollDialStatus(callSid);
@@ -251,23 +446,36 @@ export const useCallStore = create<CallState>((set, get) => ({
   // Twilio only transmits DTMF on a connected call — pressing a key while it's
   // still ringing would be silently dropped, so ignore it rather than pretend.
   sendDigit: (digit) => {
-    const { call, phase } = get();
-    if (!call || phase !== 'in_call') return;
+    const { call, piopiy, provider, phase } = get();
+    if (phase !== 'in_call') return;
     if (!/^[0-9*#]$/.test(digit)) return;
-    call.sendDigits(digit);
+    if (provider === 'telecmi') {
+      if (!piopiy) return;
+      piopiy.sendDtmf(digit);
+    } else {
+      if (!call) return;
+      call.sendDigits(digit);
+    }
     set((s) => ({ digitsSent: s.digitsSent + digit }));
   },
 
   toggleMute: () => {
-    const { call, muted } = get();
-    if (!call) return;
-    call.mute(!muted);
+    const { call, piopiy, provider, muted } = get();
+    if (provider === 'telecmi') {
+      if (!piopiy) return;
+      if (muted) piopiy.unMute();
+      else piopiy.mute();
+    } else {
+      if (!call) return;
+      call.mute(!muted);
+    }
     set({ muted: !muted });
   },
 
   hangup: () => {
-    const { call } = get();
-    call?.disconnect();
+    const { call, piopiy, provider } = get();
+    if (provider === 'telecmi') piopiy?.terminate();
+    else call?.disconnect();
   },
 
   // After a 0-duration call, poll Twilio's dial result (it arrives a moment later)
@@ -302,10 +510,19 @@ export const useCallStore = create<CallState>((set, get) => ({
     set({ pending: null, phase: 'idle', leadId: null, leadName: '', phone: '', error: null, digitsSent: '' }),
 
   destroy: () => {
-    const { device, call } = get();
+    const { device, call, piopiy } = get();
     call?.disconnect();
     device?.destroy();
-    set({ device: null, ready: false, call: null, phase: 'idle', pending: null });
+    if (piopiy) {
+      try {
+        piopiy.terminate();
+        piopiy.removeAllListeners();
+        piopiy.logout();
+      } catch {
+        /* already torn down */
+      }
+    }
+    set({ device: null, piopiy: null, ready: false, call: null, phase: 'idle', pending: null });
   },
 }));
 

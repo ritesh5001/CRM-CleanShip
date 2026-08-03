@@ -4,8 +4,9 @@ import { isValidPhoneNumber } from 'libphonenumber-js';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Misc';
 import { Keypad } from '@/features/calls/Keypad';
-import { useCallConfig } from '@/api/calls';
 import { useCallStore } from '@/store/call';
+import { useCallProvider } from '@/features/calls/useCallProvider';
+import { ProviderSwitcher } from '@/features/calls/ProviderSwitcher';
 import { toE164 } from '@/lib/phone';
 
 /**
@@ -14,13 +15,13 @@ import { toE164 } from '@/lib/phone';
  */
 export function DialerPage() {
   const [number, setNumber] = useState('');
-  const config = useCallConfig().data;
+  const { config, ready, provider, telecmiReady, defaultCountryCode } = useCallProvider();
   const startCall = useCallStore((s) => s.startCall);
   const phase = useCallStore((s) => s.phase);
   const error = useCallStore((s) => s.error);
 
   const callActive = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
-  const defaultCode = config?.defaultCountryCode || '';
+  const defaultCode = defaultCountryCode;
   // Show what will actually be dialled, so a missing country code is obvious
   // before the call fails rather than after.
   const typed = number.trim();
@@ -54,7 +55,16 @@ export function DialerPage() {
     startCall({ leadId: null, name: '', phone: e164 });
   }
 
-  const cannotCall = !config?.enabled;
+  const cannotCall = !ready;
+  // Explain the gap for whichever provider is actually selected.
+  const setupMessage =
+    provider === 'telecmi'
+      ? config && !config.providers?.telecmi?.configured
+        ? 'TeleCMI isn’t set up yet — ask your admin to configure it in Integrations.'
+        : 'No TeleCMI agent is assigned to you. Ask your admin to assign one on the Integrations page.'
+      : config && !config.configured
+        ? 'Browser calling isn’t set up yet — ask your admin to configure Twilio in Integrations.'
+        : 'No calling number is assigned to you. Ask your admin to assign one on the Integrations page.';
 
   return (
     <div className="space-y-4">
@@ -70,13 +80,12 @@ export function DialerPage() {
       {cannotCall && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <span>
-            {config && !config.configured
-              ? 'Browser calling isn’t set up yet — ask your admin to configure Twilio in Integrations.'
-              : 'No calling number is assigned to you. Ask your admin to assign one on the Integrations page.'}
-          </span>
+          <span>{setupMessage}</span>
         </div>
       )}
+
+      {/* Choose the backend (and, for TeleCMI, browser vs ring-my-phone). */}
+      {(telecmiReady || provider === 'telecmi') && <ProviderSwitcher />}
 
       <Card className="mx-auto max-w-xs p-4">
         <div className="mb-3">

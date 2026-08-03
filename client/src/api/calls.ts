@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { useAuthStore } from '@/store/auth';
-import type { CallLog, CallStatus, Disposition, Lead, Paginated } from '@/types';
+import type { CallLog, CallProvider, CallStatus, Disposition, Lead, Paginated } from '@/types';
 
 export function useCalls(params: { lead?: string; telecaller?: string; page?: number } = {}) {
   return useQuery({
@@ -21,6 +21,53 @@ export interface CallConfig {
   /** This user has a Twilio number to dial from (admin-assigned). */
   hasCallerId: boolean;
   defaultCountryCode?: string;
+  /** The provider this user chose, and the one actually usable right now. */
+  preferredProvider: CallProvider;
+  activeProvider: CallProvider;
+  providers: {
+    twilio: { enabled: boolean; configured: boolean; hasCallerId: boolean; defaultCountryCode?: string };
+    telecmi: {
+      enabled: boolean;
+      configured: boolean;
+      hasAgent: boolean;
+      defaultCountryCode?: string;
+      clickToCallReady: boolean;
+    };
+  };
+}
+
+/** The TeleCMI SIP credentials this user's browser softphone registers with. */
+export interface TelecmiCredentials {
+  userId: string;
+  password: string;
+  sbcUri: string;
+  defaultCountryCode?: string;
+}
+
+export async function fetchTelecmiCredentials(): Promise<TelecmiCredentials> {
+  const { data } = await api.get<{ success: boolean } & TelecmiCredentials>('/calls/telecmi/credentials');
+  return { userId: data.userId, password: data.password, sbcUri: data.sbcUri, defaultCountryCode: data.defaultCountryCode };
+}
+
+/** Asks TeleCMI to ring this telecaller's phone, then bridge `to`. */
+export async function startClickToCall(to: string, lead?: string | null): Promise<string> {
+  const { data } = await api.post<{ success: boolean; requestId: string }>('/calls/telecmi/click-to-call', {
+    to,
+    ...(lead ? { lead } : {}),
+  });
+  return data.requestId;
+}
+
+/** Saves which provider this user prefers to dial with. */
+export function useSetCallProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (provider: CallProvider) => {
+      const { data } = await api.patch<{ success: boolean; provider: CallProvider }>('/calls/provider', { provider });
+      return data.provider;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['call-config'] }),
+  });
 }
 
 /** Whether in-app (Twilio) calling is configured on the server (+ default country code). */
@@ -82,6 +129,11 @@ interface LogCallVars {
   durationSec?: number;
   nextFollowUpAt?: string;
   twilioCallSid?: string;
+  /** Which backend placed the call, so the outcome is logged against the right one. */
+  provider?: CallProvider;
+  mode?: 'softphone' | 'click_to_call';
+  telecmiCallId?: string;
+  telecmiRequestId?: string;
   phone?: 'phone1' | 'phone2' | 'phone3';
   phoneNumber?: string;
 }
