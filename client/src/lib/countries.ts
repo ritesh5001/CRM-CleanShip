@@ -104,3 +104,20 @@ export function countryCurrentTime(country?: string | null): string | null {
     return null;
   }
 }
+
+/**
+ * Canonical country names for the contact form's suggestion list. The map above
+ * carries aliases (usa/us/america all map to US), so dedupe on ISO and keep the
+ * first spelling — that yields the full name rather than an abbreviation.
+ * The field stays free text: imported data holds spellings not listed here.
+ */
+export const COUNTRY_NAMES: string[] = (() => {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const [name, info] of Object.entries(COUNTRIES)) {
+    if (seen.has(info.iso)) continue;
+    seen.add(info.iso);
+    names.push(name.replace(/\b\w/g, (c) => c.toUpperCase()));
+  }
+  return names.sort();
+})();

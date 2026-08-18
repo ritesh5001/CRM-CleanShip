@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ReactNode } from 'react';
 
 const base =
@@ -16,9 +17,13 @@ export function FieldError({ children }: { children?: ReactNode }) {
   return <p className="mt-1 text-xs text-rose-600">{children}</p>;
 }
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${base} ${props.className ?? ''}`} />;
-}
+// Ref-forwarding so callers can focus a field (e.g. the contact form autofocuses
+// its first input when it opens).
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input(props, ref) {
+    return <input ref={ref} {...props} className={`${base} ${props.className ?? ''}`} />;
+  }
+);
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={`${base} ${props.className ?? ''}`} />;

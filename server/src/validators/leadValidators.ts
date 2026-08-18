@@ -15,6 +15,7 @@ export const createLeadSchema = z.object({
   source: z.string().optional().default('manual'),
   tags: z.array(z.string()).optional().default([]),
   priority: z.enum(LEAD_PRIORITIES).optional().default('medium'),
+  status: z.enum(LEAD_STATUSES as [string, ...string[]]).optional(),
   notes: z.string().optional().default(''),
   assignedTo: z.string().optional(),
 });
@@ -35,6 +36,10 @@ export const updateLeadSchema = z.object({
   priority: z.enum(LEAD_PRIORITIES).optional(),
   status: z.enum(LEAD_STATUSES as [string, ...string[]]).optional(),
   notes: z.string().optional(),
+  qualified: z.boolean().optional(),
+  // Admin-only in practice — the controller drops it for telecallers.
+  assignedTo: z.string().optional().or(z.literal('')),
+  nextFollowUpAt: z.coerce.date().optional().nullable(),
 });
 
 export const addRemarkSchema = z.object({

@@ -17,7 +17,7 @@ import { useUiStore } from '@/store/ui';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Field';
 import { ContactsTable, ColumnsMenu, ShowNumbersToggle } from './ContactsTable';
-import { LeadFormModal } from '@/features/leads/LeadFormModal';
+import { ContactFormModal } from './ContactFormModal';
 import { ImportModal } from '@/features/leads/ImportModal';
 import { downloadLeadsCsv } from '@/lib/csv';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -251,14 +251,14 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
           <Download size={14} /> Export
         </Button>
         {selectable && (
-          <>
-            <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>
-              <Upload size={14} /> Import
-            </Button>
-            <Button size="sm" onClick={() => setFormOpen(true)}>
-              <Plus size={14} /> Add
-            </Button>
-          </>
+          <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>
+            <Upload size={14} /> Import
+          </Button>
+        )}
+        {isAdmin && (
+          <Button size="sm" onClick={() => setFormOpen(true)}>
+            <Plus size={14} /> Add
+          </Button>
         )}
 
         {/* Pagination — inline in the top bar */}
@@ -411,7 +411,7 @@ export function ContactsView({ mode }: { mode: 'contacts' | 'leads' }) {
 
       {isAdmin && (
         <>
-          <LeadFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+          <ContactFormModal open={formOpen} onClose={() => setFormOpen(false)} />
           <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
         </>
       )}

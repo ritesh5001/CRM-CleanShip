@@ -193,7 +193,30 @@ export const updateLead = asyncHandler(async (req: Request, res: Response) => {
   if (req.user!.role === 'telecaller' && String(lead.assignedTo) !== req.user!.id) {
     throw ApiError.forbidden('This lead is not assigned to you');
   }
-  Object.assign(lead, req.body);
+
+  const body = { ...req.body };
+
+  // Ownership is an admin power. The edit form only renders the field for admins,
+  // but a telecaller could still post it — drop it rather than trust the client,
+  // otherwise they could reassign a contact away from themselves (or grab another's).
+  if (req.user!.role === 'telecaller') delete body.assignedTo;
+
+  // Reassigning through the edit form should behave like PATCH /:id/assign:
+  // validate the target and stamp the assignment metadata.
+  if ('assignedTo' in body) {
+    if (body.assignedTo) {
+      if (idOf(lead.assignedTo) !== body.assignedTo) {
+        await assertTelecaller(body.assignedTo, req.workspaceId);
+        body.assignedAt = new Date();
+        if (lead.status === 'new') body.status = body.status ?? 'assigned';
+      }
+    } else {
+      body.assignedTo = null;
+      body.assignedAt = null;
+    }
+  }
+
+  Object.assign(lead, body);
   // Clearing/editing a number inline can leave a hole (e.g. phone2 emptied while
   // phone3 is filled) — slide the rest up so the slots stay contiguous.
   await compactLeadPhones(lead);

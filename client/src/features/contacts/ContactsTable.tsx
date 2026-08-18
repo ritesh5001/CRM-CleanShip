@@ -27,6 +27,7 @@ import { useAddRemark, useScheduleFollowUp, useUpdateLead, useDeleteLead, useUpd
 import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useCallStore } from '@/store/call';
 import { CallHistory } from '@/features/calls/CallHistory';
+import { ContactFormModal } from './ContactFormModal';
 import {
   LEAD_STATUS_COLORS,
   LEAD_STATUS_LABELS,
@@ -385,10 +386,100 @@ function PhoneRemarkCell({ lead, phone }: { lead: Lead; phone: PhoneSlot }) {
 
 /* ----------------------------- column registry ---------------------------- */
 
+
+/* --------------------------- inline editable cell -------------------------- */
+
+/**
+ * Click-to-edit for the text fields people correct most often. Saves on Enter or
+ * blur, cancels on Escape. The full record (tags, notes, status, location, …)
+ * is edited through ContactFormModal — this is the fast path, not a replacement.
+ */
+function EditableTextCell({
+  lead,
+  field,
+  placeholder,
+  type = 'text',
+}: {
+  lead: Lead;
+  field: 'name' | 'title' | 'company' | 'email' | 'city';
+  placeholder?: string;
+  type?: string;
+}) {
+  const update = useUpdateLead();
+  const current = (lead[field] as string | undefined) ?? '';
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(current);
+
+  function save() {
+    const next = val.trim();
+    if (next === current) {
+      setEditing(false);
+      return;
+    }
+    if (field === 'name' && !next) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    update.mutate(
+      { id: lead._id, [field]: next } as { id: string } & Partial<Lead>,
+      {
+        onSuccess: () => {
+          setEditing(false);
+          toast.success('Saved');
+        },
+        onError: (e) => {
+          toast.error(apiError(e));
+          setVal(current);
+          setEditing(false);
+        },
+      }
+    );
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type={type}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save();
+          else if (e.key === 'Escape') {
+            setVal(current);
+            setEditing(false);
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder={placeholder}
+        className="w-full rounded border border-brand-500 bg-white px-1.5 py-0.5 text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setVal(current);
+        setEditing(true);
+      }}
+      title={current || 'Click to edit'}
+      className="flex w-full min-w-0 items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-slate-100 dark:hover:bg-slate-700"
+    >
+      <span className="truncate">{current || '\u2014'}</span>
+      <Pencil size={11} className="shrink-0 text-slate-300 opacity-0 group-hover:opacity-100 dark:text-slate-500" />
+    </button>
+  );
+}
+
 interface CellCtx {
   isAdmin: boolean;
   telecallers: User[];
   onAssign?: (id: string, tid: string, name: string) => void;
+  onEdit?: (lead: Lead) => void;
 }
 
 interface ColumnDef {
@@ -409,16 +500,27 @@ const COLUMNS: ColumnDef[] = [
     label: 'Name',
     sortField: 'name',
     locked: true,
-    cell: (l) => (
-      <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate font-medium text-slate-800 dark:text-slate-100" title={l.name}>{l.name}</p>
+    cell: (l, ctx) => (
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 flex-1 font-medium text-slate-800 dark:text-slate-100">
+          <EditableTextCell lead={l} field="name" />
+        </span>
         <Badge className={`shrink-0 ${LEAD_STATUS_COLORS[l.status]}`}>{LEAD_STATUS_LABELS[l.status]}</Badge>
         {l.qualified && <Badge className="shrink-0 bg-green-600 text-white">Lead</Badge>}
+        {ctx.onEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); ctx.onEdit!(l); }}
+            title="Edit all details"
+            className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
       </div>
     ),
   },
-  { id: 'title', label: 'Title', muted: true, cell: (l) => <span className="block truncate" title={l.title}>{l.title || '—'}</span> },
-  { id: 'company', label: 'Company', sortField: 'company', muted: true, cell: (l) => <span className="block truncate" title={l.company}>{l.company || '—'}</span> },
+  { id: 'title', label: 'Title', muted: true, cell: (l) => <EditableTextCell lead={l} field="title" /> },
+  { id: 'company', label: 'Company', sortField: 'company', muted: true, cell: (l) => <EditableTextCell lead={l} field="company" /> },
   {
     id: 'location',
     label: 'Location',
@@ -435,14 +537,7 @@ const COLUMNS: ColumnDef[] = [
     id: 'email',
     label: 'Email',
     muted: true,
-    cell: (l) =>
-      l.email ? (
-        <a href={`mailto:${l.email}`} title={l.email} className="block truncate hover:text-brand-600" onClick={(e) => e.stopPropagation()}>
-          {l.email}
-        </a>
-      ) : (
-        '—'
-      ),
+    cell: (l) => <EditableTextCell lead={l} field="email" type="email" />,
   },
   { id: 'priority', label: 'Priority', cell: (l, ctx) => <PriorityCell lead={l} isAdmin={ctx.isAdmin} /> },
   {
@@ -593,6 +688,10 @@ export function ContactsTable({
 }: Props) {
   const isAdmin = role === 'superadmin';
   const pad = density === 'compact' ? 'px-2 py-1' : 'px-2 py-2.5';
+
+  // The contact currently open in the full edit modal (null = closed). Both roles
+  // may edit; the server scopes telecallers to contacts assigned to them.
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
   // Resizable columns (widths persisted in the UI store).
   const storedWidths = useUiStore((s) => s.colWidths);
@@ -759,6 +858,7 @@ export function ContactsTable({
                 onToggle={onToggle}
                 telecallers={telecallers}
                 onAssign={onAssign}
+                onEdit={setEditingLead}
               />
             ))}
           </tbody>
@@ -778,9 +878,16 @@ export function ContactsTable({
             onToggle={onToggle}
             telecallers={telecallers}
             onAssign={onAssign}
+            onEdit={setEditingLead}
           />
         ))}
       </div>
+
+      <ContactFormModal
+        open={!!editingLead}
+        lead={editingLead}
+        onClose={() => setEditingLead(null)}
+      />
     </>
   );
 }
@@ -1027,7 +1134,15 @@ function RemarkCell({ lead }: { lead: Lead }) {
   );
 }
 
-function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
+function ExpandedDetail({
+  lead,
+  isAdmin,
+  onEdit,
+}: {
+  lead: Lead;
+  isAdmin: boolean;
+  onEdit?: (lead: Lead) => void;
+}) {
   const del = useDeleteLead();
   const loc = location(lead);
 
@@ -1060,11 +1175,18 @@ function ExpandedDetail({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
           {lead.lastContactedAt && <Detail label="Last contacted" value={fmtDateTime(lead.lastContactedAt)} />}
           {lead.nextFollowUpAt && <Detail label="Next follow-up" value={fmtDateTime(lead.nextFollowUpAt)} />}
           <Detail label="Added" value={fmtDateTime(lead.createdAt)} />
-          {isAdmin && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
-              <Trash2 size={14} /> Delete contact
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {onEdit && (
+              <Button size="sm" variant="secondary" onClick={() => onEdit(lead)}>
+                <Pencil size={14} /> Edit details
+              </Button>
+            )}
+            {isAdmin && (
+              <Button size="sm" variant="danger" onClick={onDelete}>
+                <Trash2 size={14} /> Delete contact
+              </Button>
+            )}
+          </div>
         </div>
         <div>
           <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">All Remarks</p>
@@ -1116,6 +1238,7 @@ function Row({
   onToggle,
   telecallers,
   onAssign,
+  onEdit,
 }: {
   lead: Lead;
   columns: ColumnDef[];
@@ -1128,10 +1251,11 @@ function Row({
   onToggle: (id: string) => void;
   telecallers: User[];
   onAssign?: (id: string, tid: string, name: string) => void;
+  onEdit?: (lead: Lead) => void;
 }) {
   const [open, setOpen] = useState(false);
   const muted = 'text-slate-500 dark:text-slate-400';
-  const ctx: CellCtx = { isAdmin, telecallers, onAssign };
+  const ctx: CellCtx = { isAdmin, telecallers, onAssign, onEdit };
 
   // Frozen-left cells share an opaque background that follows the row hover state.
   const stickyBg =
@@ -1168,7 +1292,7 @@ function Row({
       {open && (
         <tr>
           <td colSpan={99} className="p-0">
-            <ExpandedDetail lead={lead} isAdmin={isAdmin} />
+            <ExpandedDetail lead={lead} isAdmin={isAdmin} onEdit={onEdit} />
           </td>
         </tr>
       )}
@@ -1187,6 +1311,7 @@ function MobileCard({
   onToggle,
   telecallers,
   onAssign,
+  onEdit,
 }: {
   lead: Lead;
   isAdmin: boolean;
@@ -1196,6 +1321,7 @@ function MobileCard({
   onToggle: (id: string) => void;
   telecallers: User[];
   onAssign?: (id: string, tid: string, name: string) => void;
+  onEdit?: (lead: Lead) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -1209,6 +1335,15 @@ function MobileCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="font-medium text-slate-800 dark:text-slate-100">{lead.name}</p>
             {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
+            {onEdit && (
+              <button
+                onClick={() => onEdit(lead)}
+                title="Edit all details"
+                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
           </div>
           <p className="truncate text-sm text-slate-500 dark:text-slate-400">
             {formatPhoneDisplay(lead.phone, lead.country)}
@@ -1229,7 +1364,7 @@ function MobileCard({
       </div>
       {open && (
         <div className="mt-2 overflow-hidden rounded-lg">
-          <ExpandedDetail lead={lead} isAdmin={isAdmin} />
+          <ExpandedDetail lead={lead} isAdmin={isAdmin} onEdit={onEdit} />
         </div>
       )}
     </div>
