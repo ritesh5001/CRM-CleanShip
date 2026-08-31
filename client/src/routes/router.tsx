@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute, RoleRoute } from './guards';
 import { LoginPage } from '@/pages/LoginPage';
@@ -12,6 +12,12 @@ import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { RecentsPage } from '@/pages/RecentsPage';
 import { DeviceTestPage } from '@/pages/DeviceTestPage';
 import { DialerPage } from '@/pages/DialerPage';
+
+/** Redirects the legacy /tasks/:id notification link onto the Tasks page's detail view. */
+function TaskDeepLink() {
+  const { id } = useParams();
+  return <Navigate to={`/tasks?task=${id}`} replace />;
+}
 
 export function AppRoutes() {
   return (
@@ -36,6 +42,8 @@ export function AppRoutes() {
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        {/* Older task notifications linked to /tasks/:id — keep them working. */}
+        <Route path="/tasks/:id" element={<TaskDeepLink />} />
         <Route path="/followups" element={<FollowUpsPage />} />
         <Route path="/recents" element={<RecentsPage />} />
         <Route path="/dialer" element={<DialerPage />} />

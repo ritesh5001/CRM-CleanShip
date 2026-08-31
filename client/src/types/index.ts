@@ -97,18 +97,26 @@ export interface Remark {
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
+export type TaskType = 'call' | 'follow_up' | 'custom';
+
 export interface Task {
   _id: string;
   title: string;
   description?: string;
-  type: 'call' | 'follow_up' | 'custom';
+  type: TaskType;
   relatedLead?: Lead | string | null;
   assignedTo?: User | string;
   assignedBy?: User | string;
   dueDate?: string;
   priority: 'low' | 'medium' | 'high';
   status: TaskStatus;
+  /** Stamped the first time the task moves to In Progress. */
+  startedAt?: string;
+  /** When the work was actually done — set by whoever completed it, not the click time. */
   completedAt?: string;
+  completedBy?: User | string;
+  completionNote?: string;
+  timeSpentMin?: number;
   createdAt: string;
 }
 

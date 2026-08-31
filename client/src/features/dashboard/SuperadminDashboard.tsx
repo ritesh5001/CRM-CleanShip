@@ -1,4 +1,5 @@
-import { Users, Contact, Phone, TrendingUp } from 'lucide-react';
+import { Users, Contact, Phone, TrendingUp, ListChecks } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -30,7 +31,7 @@ export function SuperadminDashboard() {
     <div className="space-y-5">
       <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label="Users"
           value={data.totalTelecallers}
@@ -45,6 +46,14 @@ export function SuperadminDashboard() {
           sub={`${data.convertedLeads} converted`}
           icon={<TrendingUp size={18} />}
         />
+        <Link to="/tasks">
+          <StatCard
+            label="Open Tasks"
+            value={data.pendingTasks}
+            sub="Assigned, not yet done"
+            icon={<ListChecks size={18} />}
+          />
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

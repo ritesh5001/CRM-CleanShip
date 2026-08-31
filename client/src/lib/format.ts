@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow, isToday, isPast } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isTomorrow, isYesterday, isPast } from 'date-fns';
 
 export function fmtDate(d?: string | Date | null) {
   if (!d) return '—';
@@ -41,4 +41,31 @@ export function telLink(phone: string) {
 /** Builds a WhatsApp deep link. */
 export function whatsappLink(phone: string) {
   return `https://wa.me/${phone.replace(/[^\d]/g, '')}`;
+}
+
+/** Formats a date to local `yyyy-MM-ddTHH:mm` for an `<input type="datetime-local">`. */
+export function toDateTimeInput(d?: string | Date | null) {
+  if (!d) return '';
+  return format(new Date(d), "yyyy-MM-dd'T'HH:mm");
+}
+
+/** "2h 15m" / "45m" — for a self-reported effort in minutes. */
+export function fmtMinutes(mins?: number | null) {
+  if (mins == null || mins < 0) return '';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (!h) return `${m}m`;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Day-relative label for a due date: "Today, 4:30 pm" / "Tomorrow" / "12 Mar". */
+export function fmtDueLabel(d?: string | Date | null) {
+  if (!d) return 'No due date';
+  const date = new Date(d);
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
+  const time = hasTime ? `, ${format(date, 'h:mm a')}` : '';
+  if (isToday(date)) return `Today${time}`;
+  if (isTomorrow(date)) return `Tomorrow${time}`;
+  if (isYesterday(date)) return `Yesterday${time}`;
+  return `${format(date, 'dd MMM')}${time}`;
 }

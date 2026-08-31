@@ -86,7 +86,14 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   `phoneNOutcome`, its `remarks[].phone` tags and its `CallLog.phone` rows with it (`compactLeadPhones`
   in `leadController`). Existing data was backfilled by `scripts/compactPhones.ts`.
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
-  dueDate, priority, status(pending|in_progress|completed|cancelled), completedAt`.
+  dueDate, priority, status(pending|in_progress|completed|cancelled), startedAt, completedAt,
+  completedBy, completionNote, timeSpentMin`. `dueDate` carries a **time**, not just a date.
+  **`completedAt` is when the work was actually done, not when the button was clicked** — the
+  telecaller reports it in `CompleteTaskModal` (defaults to now, quick chips for "1 hour ago" etc.),
+  and the server rejects a future time or one before the task existed (with a 60s grace, since a
+  `datetime-local` input only carries minute precision). Reopening a task clears the whole
+  completion record. Admin assigns to **several users at once**: `assignedTo` accepts an array on
+  create and the server fans it out to one task per assignee, so everyone owns their own copy.
 - **CallLog** — one row per call activity (so Recents/history is complete): `lead` (**optional** — a
   custom dial to an unsaved number has no contact; see Dialer), `telecaller,
   disposition? (set when connected), callStatus (connected|not_connected|voicemail|incorrect_no),
@@ -118,8 +125,16 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   `PATCH /leads/bulk-assign`, `PATCH /leads/:id/assign`, `POST /leads/:id/remarks` (both roles add to
   the shared timeline; telecaller scoped to assigned). Writes/import/assign are superadmin-only;
   telecallers get a scoped `GET`/`PUT`.
-- **Tasks:** `GET /tasks`, `POST /tasks` (admin), `GET /tasks/:id`, `PUT /tasks/:id` (admin),
-  `PATCH /tasks/:id/status`, `DELETE /tasks/:id` (admin).
+- **Tasks:** `GET /tasks` (filters: `search`, `status` — comma-separated for the "To do" tab,
+  `priority`, `type`, `assignedTo`, `scope=today|overdue|upcoming|undated`, `sortBy`/`order`;
+  default order is open work first, then due date with undated last, then priority — computed in an
+  aggregation because Mongo sorts missing dates first), `GET /tasks/stats` (tab/headline counts in
+  one `$facet`, ignoring `status`), `POST /tasks` (admin; `assignedTo` may be an array — see Task
+  above), `GET /tasks/:id`, `PUT /tasks/:id` (admin; validates a new assignee, notifies on reassign,
+  `null` clears `dueDate`/`relatedLead`), `PATCH /tasks/:id/status` (both roles on their own tasks;
+  carries `completedAt`/`completionNote`/`timeSpentMin`), `DELETE /tasks/:id` (admin).
+  Task notifications link to `/tasks?task=<id>`, which the Tasks page opens as a detail modal;
+  `/tasks/:id` redirects there for older notifications.
 - **Calls:** `GET /calls` (call history; `?lead=` for one contact; telecaller scoped to own),
   `POST /calls` — telecaller call update: `callStatus: done|not_done`, optional `disposition`
   (required when done), optional `remark` + `nextFollowUpAt`, optional `twilioCallSid`, and `phone`
