@@ -42,17 +42,19 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+// Light/dark pairs are defined together so chips keep their meaning (and 4.5:1
+// contrast) on both the white and the slate-950 surface.
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
-  pending: 'bg-slate-100 text-slate-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-rose-100 text-rose-700',
+  pending: 'bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
+  in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+  cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
 };
 
 export const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-slate-100 text-slate-600',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-rose-100 text-rose-700',
+  low: 'bg-slate-100 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300',
+  medium: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+  high: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
 };
 
 export const CALL_STATUS_LABELS: Record<CallStatus, string> = {

@@ -89,12 +89,27 @@ export function useCreateTask() {
   });
 }
 
+/** Inline cell edits patch the row immediately so the table never flickers. */
 export function useUpdateTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...payload }: { id: string } & Partial<TaskFormPayload> & { assignedTo?: string; status?: TaskStatus; completedAt?: string }) =>
       (await api.put<{ task: Task }>(`/tasks/${id}`, payload)).data.task,
-    onSuccess: () => invalidateTasks(qc),
+    onMutate: async ({ id, ...payload }) => {
+      await qc.cancelQueries({ queryKey: ['tasks'] });
+      const snapshots = patchListItem<Task>(qc, ['tasks'], id, (t) => ({
+        ...t,
+        ...(payload.title !== undefined && { title: payload.title }),
+        ...(payload.description !== undefined && { description: payload.description }),
+        ...(payload.type !== undefined && { type: payload.type }),
+        ...(payload.priority !== undefined && { priority: payload.priority }),
+        ...(payload.status !== undefined && { status: payload.status }),
+        ...(payload.dueDate !== undefined && { dueDate: payload.dueDate ?? undefined }),
+      }));
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => restoreSnapshots(qc, ctx?.snapshots),
+    onSettled: () => invalidateTasks(qc),
   });
 }
 

@@ -69,3 +69,11 @@ export function fmtDueLabel(d?: string | Date | null) {
   if (isYesterday(date)) return `Yesterday${time}`;
   return `${format(date, 'dd MMM')}${time}`;
 }
+
+/** Compact stamp for dense table cells: "01 Sep, 9:21 AM" (year only when it isn't this one). */
+export function fmtStamp(d?: string | Date | null) {
+  if (!d) return '—';
+  const date = new Date(d);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return format(date, sameYear ? 'dd MMM, h:mm a' : 'dd MMM yyyy, h:mm a');
+}

@@ -133,7 +133,7 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   above), `GET /tasks/:id`, `PUT /tasks/:id` (admin; validates a new assignee, notifies on reassign,
   `null` clears `dueDate`/`relatedLead`), `PATCH /tasks/:id/status` (both roles on their own tasks;
   carries `completedAt`/`completionNote`/`timeSpentMin`), `DELETE /tasks/:id` (admin).
-  Task notifications link to `/tasks?task=<id>`, which the Tasks page opens as a detail modal;
+  Task notifications link to `/tasks?task=<id>`, which the Tasks page expands as a row;
   `/tasks/:id` redirects there for older notifications.
 - **Calls:** `GET /calls` (call history; `?lead=` for one contact; telecaller scoped to own),
   `POST /calls` — telecaller call update: `callStatus: done|not_done`, optional `disposition`
@@ -319,6 +319,23 @@ authenticates, so omitting them 400s regardless of credentials.
   CallLog must handle `lead: null`.
 - In dev builds only, `window.callStore` exposes the softphone store (state is otherwise unreachable
   outside a live call); `import.meta.env.DEV` strips it from production bundles.
+
+## Tasks UI (no dialogs)
+
+`pages/TasksPage.tsx` is a **table**, and every task action happens inline — there are no modals:
+
+- **`features/tasks/TaskComposer.tsx`** — the whole assign flow lives in a bar above the table.
+  Type a title, pick people from a native `<select>` (each pick becomes a removable chip, so one
+  task fans out to several users), optionally set due/priority/type, press **Enter**.
+- **`features/tasks/TaskTable.tsx`** — assignee, priority and status are in-cell `<select>`s that
+  save instantly (`useUpdateTask` patches the cache optimistically). Choosing *Completed*, or
+  clicking the row's tick, expands a **completion strip** in a second `<tr>` where the telecaller
+  reports *when* they did it, the time spent and a note. The chevron expands a **details row**
+  (admin edits title/details/due/type in place; both roles see the completion record).
+- Fixed column widths total ~48rem, so the table sets `min-w-[60rem]` inside an `overflow-x-auto`
+  wrapper — otherwise the Task column starves and titles wrap one word per line. Everything fits
+  from ~1280px; below that the table (not the page) scrolls.
+- Badge colour maps in `lib/constants.ts` carry explicit `dark:` pairs — the app is used in dark mode.
 
 ## Notes for future work
 
