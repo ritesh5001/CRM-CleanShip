@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { api } from './client';
 import { patchListItem, removeListItem, restoreSnapshots } from '@/lib/queryPatch';
 import type { Paginated, Task, TaskStatus, TaskType } from '@/types';
@@ -62,13 +63,36 @@ export function useTask(id?: string | null) {
   });
 }
 
+/**
+ * Set once if the API answers `/tasks/stats` with 400/404 — i.e. it predates that
+ * route. The result can't change without a redeploy (which reloads the app), so
+ * after one probe the query is switched off instead of re-failing on every filter
+ * change and spraying bad requests into the console.
+ */
+let statsUnsupported = false;
+
 /** Counts for the status tabs. Ignores `status`/paging — the server recomputes each tab in scope. */
 export function useTaskStats(params: TaskQuery = {}) {
   const { status: _s, page: _p, limit: _l, ...scope } = params;
-  return useQuery({
+  const query = useQuery({
     queryKey: ['task-stats', scope],
-    queryFn: async () => (await api.get<{ stats: TaskStats }>('/tasks/stats', { params: scope })).data.stats,
+    enabled: !statsUnsupported,
+    // A 4xx here is deterministic; retrying only doubles the noise.
+    retry: false,
+    queryFn: async () => {
+      try {
+        return (await api.get<{ stats: TaskStats }>('/tasks/stats', { params: scope })).data.stats;
+      } catch (err) {
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        if (status === 400 || status === 404) statsUnsupported = true;
+        throw err;
+      }
+    },
   });
+
+  // Once unsupported the query is disabled, so surface the failure ourselves —
+  // callers rely on it to fall back instead of rendering wrong numbers.
+  return { ...query, isError: query.isError || statsUnsupported };
 }
 
 function invalidateTasks(qc: ReturnType<typeof useQueryClient>) {
