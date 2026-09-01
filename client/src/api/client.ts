@@ -37,10 +37,30 @@ api.interceptors.response.use(
   }
 );
 
-/** Extracts a human-readable message from an axios error. */
+interface ApiErrorBody {
+  message?: string;
+  /** Zod issues from the `validate` middleware: which field failed and why. */
+  details?: { path?: string; message?: string }[] | unknown;
+}
+
+/**
+ * Extracts a human-readable message from an axios error.
+ *
+ * The server sends validation failures as `{ message: 'Validation failed', details: [...] }`;
+ * without the details the toast just says "Validation failed", which tells nobody anything —
+ * so the offending fields are appended.
+ */
 export function apiError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.message ?? err.message;
+  if (!axios.isAxiosError(err)) return 'Something went wrong';
+
+  const body = err.response?.data as ApiErrorBody | undefined;
+  const message = body?.message ?? err.message;
+
+  if (Array.isArray(body?.details)) {
+    const fields = (body.details as { path?: string; message?: string }[])
+      .map((d) => [d?.path, d?.message].filter(Boolean).join(': '))
+      .filter(Boolean);
+    if (fields.length) return `${message} — ${fields.join('; ')}`;
   }
-  return 'Something went wrong';
+  return message;
 }
