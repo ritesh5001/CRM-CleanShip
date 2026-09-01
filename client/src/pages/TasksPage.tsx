@@ -57,7 +57,8 @@ export function TasksPage() {
   );
 
   const { data, isLoading } = useTasks(query);
-  const { data: stats } = useTaskStats(query);
+  // If the counts can't be fetched, show '—' rather than a confident, wrong 0.
+  const { data: stats, isError: statsFailed } = useTaskStats(query);
   const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 200 }, { enabled: isAdmin });
 
   // Filters change the result set — go back to the first page.
@@ -92,7 +93,7 @@ export function TasksPage() {
       label: 'Overdue',
       value: stats?.overdue ?? 0,
       icon: <AlertTriangle size={16} />,
-      danger: (stats?.overdue ?? 0) > 0,
+      danger: !statsFailed && (stats?.overdue ?? 0) > 0,
       active: scope === 'overdue',
       on: () => {
         setTab('open');
@@ -154,7 +155,7 @@ export function TasksPage() {
             </span>
             <span className="min-w-0">
               <span className="block text-lg font-bold leading-tight tabular-nums text-slate-800 dark:text-slate-100">
-                {c.value}
+                {statsFailed ? <span className="text-slate-400 dark:text-slate-600">—</span> : c.value}
               </span>
               <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{c.label}</span>
             </span>

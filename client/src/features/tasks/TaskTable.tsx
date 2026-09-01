@@ -46,7 +46,7 @@ export function TaskTable({ tasks, isAdmin, people, openId, onOpenHandled }: Pro
             <th className={TH}>Task</th>
             {isAdmin && <th className={`${TH} w-32`}>Assignee</th>}
             <th className={`${TH} w-32`}>Due</th>
-            <th className={`${TH} w-24`}>Priority</th>
+            <th className={`${TH} w-28`}>Priority</th>
             <th className={`${TH} w-32`}>Status</th>
             <th className={`${TH} w-40`}>Completed</th>
             <th className={`${TH} w-14`}>

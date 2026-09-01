@@ -24,6 +24,17 @@ function oid(value: string): Types.ObjectId {
   return new Types.ObjectId(value);
 }
 
+/**
+ * Guards the `:id` routes. Without this a path that isn't a real id — e.g. a
+ * client calling `/tasks/stats` against a build that predates that route —
+ * reaches Mongoose and surfaces as a baffling 400 "Invalid identifier".
+ */
+function taskId(req: Request): string {
+  const { id } = req.params;
+  if (!Types.ObjectId.isValid(id)) throw ApiError.notFound('Task not found');
+  return id;
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -166,7 +177,7 @@ export const taskStats = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findOne({ _id: req.params.id, workspace: req.workspaceId }).populate(POPULATE);
+  const task = await Task.findOne({ _id: taskId(req), workspace: req.workspaceId }).populate(POPULATE);
   if (!task) throw ApiError.notFound('Task not found');
   if (req.user!.role === 'telecaller' && idOf(task.assignedTo) !== req.user!.id) {
     throw ApiError.forbidden('This task is not assigned to you');
@@ -282,7 +293,7 @@ function applyStatus(
 }
 
 export const updateTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findOne({ _id: req.params.id, workspace: req.workspaceId });
+  const task = await Task.findOne({ _id: taskId(req), workspace: req.workspaceId });
   if (!task) throw ApiError.notFound('Task not found');
 
   const { assignedTo, relatedLead, dueDate, status, completedAt, ...rest } = req.body as Record<
@@ -333,7 +344,7 @@ export const updateTask = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const updateTaskStatus = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findOne({ _id: req.params.id, workspace: req.workspaceId });
+  const task = await Task.findOne({ _id: taskId(req), workspace: req.workspaceId });
   if (!task) throw ApiError.notFound('Task not found');
 
   // Telecallers can only update the status of their own tasks.
@@ -362,7 +373,7 @@ export const updateTaskStatus = asyncHandler(async (req: Request, res: Response)
 });
 
 export const deleteTask = asyncHandler(async (req: Request, res: Response) => {
-  const task = await Task.findOneAndDelete({ _id: req.params.id, workspace: req.workspaceId });
+  const task = await Task.findOneAndDelete({ _id: taskId(req), workspace: req.workspaceId });
   if (!task) throw ApiError.notFound('Task not found');
   res.json({ success: true, message: 'Task deleted' });
 });
