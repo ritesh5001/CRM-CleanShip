@@ -83,7 +83,8 @@ function invalidateTasks(qc: ReturnType<typeof useQueryClient>) {
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: TaskFormPayload & { assignedTo: string[] }) =>
+    // `assignedTo` takes one id or many — the server creates a task per assignee.
+    mutationFn: async (payload: TaskFormPayload & { assignedTo: string | string[] }) =>
       (await api.post<{ tasks: Task[]; count: number }>('/tasks', payload)).data,
     onSuccess: () => invalidateTasks(qc),
   });

@@ -49,14 +49,16 @@ export function TaskComposer() {
     }
     setError('');
     try {
+      // Omit what isn't set rather than sending explicit nulls, and send a lone
+      // assignee as a plain string — a create has nothing to clear, so null adds
+      // nothing and only narrows what the API has to accept.
       const res = await create.mutateAsync({
         title: title.trim(),
         description: '',
         type,
         priority,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
-        relatedLead: null,
-        assignedTo: assignees,
+        ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+        assignedTo: assignees.length === 1 ? assignees[0] : assignees,
       });
       toast.success(res.count > 1 ? `Assigned to ${res.count} people` : 'Task assigned');
       reset();

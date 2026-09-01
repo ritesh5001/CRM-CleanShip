@@ -12,7 +12,14 @@ import workspaceRoutes from './workspaceRoutes.js';
 
 const router = Router();
 
-router.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
+// Stamped once at boot so /health can prove *which* build is live — a stale deploy
+// otherwise looks identical to a fresh one and shows up only as odd 400s.
+const STARTED_AT = new Date().toISOString();
+const COMMIT = (process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? '').slice(0, 7);
+
+router.get('/health', (_req, res) =>
+  res.json({ success: true, status: 'ok', commit: COMMIT || 'unknown', startedAt: STARTED_AT })
+);
 router.use('/auth', authRoutes);
 router.use('/workspaces', workspaceRoutes);
 router.use('/users', userRoutes);
