@@ -43,9 +43,11 @@ export function TasksPage() {
 
   const deepLinked = params.get('task');
 
-  const query = useMemo(
+  const wantedStatus = TABS.find((t) => t.key === tab)!.value;
+  const needsMultiStatus = wantedStatus.includes(',');
+
+  const baseQuery = useMemo(
     () => ({
-      status: TABS.find((t) => t.key === tab)!.value,
       scope,
       assignedTo: isAdmin ? assignedTo : '',
       priority,
@@ -53,12 +55,30 @@ export function TasksPage() {
       page,
       limit: 50,
     }),
-    [tab, scope, assignedTo, priority, search, page, isAdmin]
+    [scope, assignedTo, priority, search, page, isAdmin]
+  );
+
+  // If the counts can't be fetched, show '—' rather than a confident, wrong 0.
+  const { data: stats, isError: statsFailed } = useTaskStats(baseQuery);
+
+  /*
+   * COMPATIBILITY SHIM — delete once the API is redeployed.
+   *
+   * `/tasks/stats` and comma-separated `status` shipped in the same commit, so a
+   * failing stats call means the API also can't read `status=pending,in_progress`
+   * — it matches that literally and returns nothing, leaving "To do" empty even
+   * though the tasks exist. When that's detected, ask for every status and narrow
+   * here instead. Costs exact pagination totals on the multi-status tabs.
+   */
+  const legacyApi = statsFailed;
+  const filterLocally = legacyApi && needsMultiStatus;
+
+  const query = useMemo(
+    () => ({ ...baseQuery, status: filterLocally ? '' : wantedStatus }),
+    [baseQuery, filterLocally, wantedStatus]
   );
 
   const { data, isLoading } = useTasks(query);
-  // If the counts can't be fetched, show '—' rather than a confident, wrong 0.
-  const { data: stats, isError: statsFailed } = useTaskStats(query);
   const { data: telecallers } = useTelecallers({ isActive: 'true', limit: 200 }, { enabled: isAdmin });
 
   // Filters change the result set — go back to the first page.
@@ -69,7 +89,10 @@ export function TasksPage() {
     if (deepLinked) setTab('all');
   }, [deepLinked]);
 
-  const pageTasks = data?.data ?? [];
+  const wanted = wantedStatus ? wantedStatus.split(',') : null;
+  const pageTasks = (data?.data ?? []).filter(
+    (t) => !filterLocally || !wanted || wanted.includes(t.status)
+  );
   // A notification can point at a task that falls outside the current page —
   // fetch that one directly and show it at the top rather than nothing at all.
   const missingDeepLink = Boolean(deepLinked) && !pageTasks.some((t) => t._id === deepLinked);
