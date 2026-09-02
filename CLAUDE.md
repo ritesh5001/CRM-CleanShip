@@ -87,12 +87,16 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   in `leadController`). Existing data was backfilled by `scripts/compactPhones.ts`.
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
   dueDate, priority, status(pending|in_progress|completed|cancelled), startedAt, completedAt,
-  completedBy, completionNote, timeSpentMin`. `dueDate` carries a **time**, not just a date.
+  completedBy, completionNote, timeSpentMin`. Task dates are **date-only — no clock anywhere** in
+  the UI (`fmtDueLabel` / `fmtStamp` render days; the inputs are `type="date"`).
   **`completedAt` is when the work was actually done, not when the button was clicked** — the
-  telecaller reports it in `CompleteTaskModal` (defaults to now, quick chips for "1 hour ago" etc.),
-  and the server rejects a future time or one before the task existed (with a 60s grace, since a
-  `datetime-local` input only carries minute precision). Reopening a task clears the whole
-  completion record. Admin assigns to **several users at once**: `assignedTo` accepts an array on
+  telecaller picks the day inline in the table row (Today / Yesterday chips). A picked day becomes
+  an instant via `completionInstant`: today resolves to *now* (never future, never before creation),
+  an earlier day to **local noon**, which survives timezone and DST shifts. Build the instant with
+  `fromDateInput` rather than `new Date('yyyy-MM-dd')` — the latter parses as UTC midnight and lands
+  on the previous day west of Greenwich. The server rejects a future date, or one more than a day
+  before the task existed (the grace covers noon-vs-creation-time and client timezone skew).
+  Reopening a task clears the whole completion record. Admin assigns to **several users at once**: `assignedTo` accepts an array on
   create and the server fans it out to one task per assignee, so everyone owns their own copy.
 - **CallLog** — one row per call activity (so Recents/history is complete): `lead` (**optional** — a
   custom dial to an unsaved number has no contact; see Dialer), `telecaller,

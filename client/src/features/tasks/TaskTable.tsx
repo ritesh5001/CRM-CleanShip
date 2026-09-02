@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import { useDeleteTask, useUpdateTask, useUpdateTaskStatus } from '@/api/tasks';
 import { apiError } from '@/api/client';
 import { PRIORITY_COLORS, TASK_STATUS_COLORS, TASK_STATUS_LABELS } from '@/lib/constants';
-import { fmtDateTime, fmtDueLabel, fmtMinutes, fmtStamp, toDateTimeInput } from '@/lib/format';
+import { fmtDueLabel, fmtMinutes, fmtStamp, fromDateInput, toDateInput } from '@/lib/format';
 import { formatPhoneDisplay } from '@/lib/phone';
-import { TASK_TYPE_LABELS, isTaskOverdue, localDateTimeInput } from './taskHelpers';
+import { TASK_TYPE_LABELS, completionInstant, isTaskOverdue, localDateInput, sameDay } from './taskHelpers';
 import type { Lead, Task, TaskStatus, TaskType, User } from '@/types';
 
 const CELL =
@@ -299,7 +299,7 @@ function TaskRow({
 /** Inline "when did you actually do it?" — the completion flow, without a dialog. */
 function CompletionStrip({ task, onClose }: { task: Task; onClose: () => void }) {
   const updateStatus = useUpdateTaskStatus();
-  const [when, setWhen] = useState(localDateTimeInput());
+  const [when, setWhen] = useState(localDateInput());
   const [mins, setMins] = useState(task.timeSpentMin ? String(task.timeSpentMin) : '');
   const [note, setNote] = useState(task.completionNote ?? '');
   const [error, setError] = useState('');
@@ -307,15 +307,15 @@ function CompletionStrip({ task, onClose }: { task: Task; onClose: () => void })
 
   useEffect(() => ref.current?.focus(), []);
 
-  const created = new Date(task.createdAt).getTime();
+  const createdOn = new Date(task.createdAt);
 
   async function submit() {
-    const at = new Date(when);
-    if (Number.isNaN(at.getTime())) return setError('Pick when you did this.');
+    const at = completionInstant(when);
+    if (!at) return setError('Pick the day you did this.');
     if (at.getTime() > Date.now() + 60_000) return setError("That's in the future.");
-    // 60s grace: the input is minute-precision, so "now" on a fresh task rounds down.
-    if (at.getTime() < created - 60_000) {
-      return setError(`This task only exists since ${fmtDateTime(task.createdAt)}.`);
+    // Compared by day: the task can't have been done before the day it existed.
+    if (at.getTime() < createdOn.getTime() && !sameDay(at, createdOn)) {
+      return setError(`This task only exists since ${fmtStamp(task.createdAt)}.`);
     }
     setError('');
     try {
@@ -333,33 +333,36 @@ function CompletionStrip({ task, onClose }: { task: Task; onClose: () => void })
     }
   }
 
+  // Only offer days the task could actually have been done on.
   const quick = [
-    { label: 'Now', mins: 0 },
-    { label: '1h ago', mins: 60 },
-    { label: '3h ago', mins: 180 },
-  ].filter((q) => Date.now() - q.mins * 60_000 >= created - 60_000);
+    { label: 'Today', daysAgo: 0 },
+    { label: 'Yesterday', daysAgo: 1 },
+  ].filter((q) => {
+    const d = completionInstant(localDateInput(new Date(), q.daysAgo));
+    return d !== null && (d.getTime() >= createdOn.getTime() || sameDay(d, createdOn));
+  });
 
   return (
     <div className="flex flex-wrap items-start gap-3">
       <div>
         <label htmlFor={`when-${task._id}`} className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          When did you do it?
+          Which day did you do it?
         </label>
         <input
           id={`when-${task._id}`}
           ref={ref}
-          type="datetime-local"
+          type="date"
           value={when}
-          max={localDateTimeInput()}
+          max={localDateInput()}
           onChange={(e) => setWhen(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
-          className={`${CELL} w-52 py-1.5`}
+          className={`${CELL} w-44 py-1.5`}
         />
         <div className="mt-1 flex gap-1">
           {quick.map((q) => (
             <button
               key={q.label}
-              onClick={() => setWhen(localDateTimeInput(new Date(), q.mins))}
+              onClick={() => setWhen(localDateInput(new Date(), q.daysAgo))}
               className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-white dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               {q.label}
@@ -433,13 +436,13 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
   const update = useUpdateTask();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
-  const [due, setDue] = useState(toDateTimeInput(task.dueDate));
+  const [due, setDue] = useState(toDateInput(task.dueDate));
   const [type, setType] = useState<TaskType>(task.type);
 
   const dirty =
     title !== task.title ||
     description !== (task.description ?? '') ||
-    due !== toDateTimeInput(task.dueDate) ||
+    due !== toDateInput(task.dueDate) ||
     type !== task.type;
 
   async function save() {
@@ -450,7 +453,8 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
         title: title.trim(),
         description: description.trim(),
         type,
-        dueDate: due ? new Date(due).toISOString() : null,
+        // Local midnight, so the stored day matches the one that was picked.
+        dueDate: due ? (fromDateInput(due) ?? new Date(due)).toISOString() : null,
       });
       toast.success('Task updated');
       onClose();
@@ -488,7 +492,7 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
             <label htmlFor={`due-${task._id}`} className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
               Due
             </label>
-            <input id={`due-${task._id}`} type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={`${CELL} w-48 py-1.5`} />
+            <input id={`due-${task._id}`} type="date" value={due} onChange={(e) => setDue(e.target.value)} className={`${CELL} w-40 py-1.5`} />
           </div>
           <div>
             <label htmlFor={`ty-${task._id}`} className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
@@ -516,8 +520,8 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-400 dark:text-slate-500">
         <span>Assigned by {nameOf(task.assignedBy)}</span>
-        <span>Created {fmtDateTime(task.createdAt)}</span>
-        {task.startedAt && task.startedAt !== task.completedAt && <span>Started {fmtDateTime(task.startedAt)}</span>}
+        <span>Created {fmtStamp(task.createdAt)}</span>
+        {task.startedAt && task.startedAt !== task.completedAt && <span>Started {fmtStamp(task.startedAt)}</span>}
         {lead && (
           <span className="inline-flex items-center gap-1">
             <Link2 size={11} /> {lead.name} · {formatPhoneDisplay(lead.phone, lead.country)}
@@ -528,7 +532,7 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
       {task.status === 'completed' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/25 dark:bg-emerald-500/10">
           <p className="flex flex-wrap items-center gap-x-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-            <CheckCircle2 size={13} /> Done {task.completedAt ? fmtDateTime(task.completedAt) : ''} by{' '}
+            <CheckCircle2 size={13} /> Done {task.completedAt ? fmtStamp(task.completedAt) : ''} by{' '}
             {nameOf(task.completedBy ?? task.assignedTo)}
             {task.timeSpentMin ? ` · took ${fmtMinutes(task.timeSpentMin)}` : ''}
           </p>

@@ -39,7 +39,7 @@ export const updateTaskSchema = z.object({
   // The admin can correct a wrongly-reported completion time.
   completedAt: z.preprocess(
     emptyToUndefined,
-    z.coerce.date().refine(notInFuture, 'Completion time cannot be in the future').optional()
+    z.coerce.date().refine(notInFuture, 'Completion date cannot be in the future').optional()
   ),
 });
 
@@ -48,7 +48,7 @@ export const updateTaskStatusSchema = z.object({
   /** When the work was actually done. Defaults to now; never accepted in the future. */
   completedAt: z.preprocess(
     emptyToUndefined,
-    z.coerce.date().refine(notInFuture, 'Completion time cannot be in the future').optional()
+    z.coerce.date().refine(notInFuture, 'Completion date cannot be in the future').optional()
   ),
   completionNote: z.string().max(2000).optional(),
   timeSpentMin: z.preprocess(

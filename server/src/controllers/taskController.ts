@@ -241,7 +241,7 @@ export const createTask = asyncHandler(async (req: Request, res: Response) => {
         type: 'task_assigned',
         title: 'New task assigned',
         message: task.dueDate
-          ? `${task.title} — due ${task.dueDate.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}`
+          ? `${task.title} — due ${task.dueDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}`
           : task.title,
         link: taskLink(task._id),
         workspace: req.workspaceId,
@@ -272,10 +272,15 @@ function applyStatus(
   if (status === 'completed') {
     const when = extra.completedAt ?? new Date();
     const createdAt = (task as unknown as { createdAt?: Date }).createdAt;
-    // A datetime-local input only carries minute precision, so a task created
-    // seconds ago would otherwise reject its own "just now" — hence the grace.
-    if (createdAt && when.getTime() < createdAt.getTime() - 60_000) {
-      throw ApiError.badRequest('Completion time cannot be before the task was created');
+    /*
+     * Completion is recorded by *day*, so this only rejects absurd values (done
+     * long before the task existed). The one-day grace matters because a past
+     * day arrives as local noon: a task created yesterday afternoon and marked
+     * done "yesterday" is legitimate even though noon precedes it, and the
+     * client's own timezone can shift the day boundary either way.
+     */
+    if (createdAt && when.getTime() < createdAt.getTime() - 24 * 60 * 60 * 1000) {
+      throw ApiError.badRequest('Completion date cannot be before the task was created');
     }
     task.completedAt = when;
     task.completedBy = new Types.ObjectId(actorId);
@@ -358,12 +363,12 @@ export const updateTaskStatus = asyncHandler(async (req: Request, res: Response)
 
   // Tell the assigner when a telecaller finishes — including when they did it.
   if (req.user!.role === 'telecaller' && status === 'completed') {
-    const when = task.completedAt!.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    const when = task.completedAt!.toLocaleDateString('en-GB', { dateStyle: 'medium' });
     await notify({
       recipient: idOf(task.assignedBy),
       type: 'task_updated',
       title: 'Task completed',
-      message: `${req.user!.name} completed "${task.title}" at ${when}`,
+      message: `${req.user!.name} completed "${task.title}" on ${when}`,
       link: taskLink(task._id),
       workspace: req.workspaceId,
     });

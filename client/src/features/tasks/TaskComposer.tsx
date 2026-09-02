@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import { useCreateTask } from '@/api/tasks';
 import { useTelecallers } from '@/api/users';
 import { apiError } from '@/api/client';
-import { TASK_TYPE_LABELS, localDateTimeInput } from './taskHelpers';
+import { fromDateInput } from '@/lib/format';
+import { TASK_TYPE_LABELS, localDateInput } from './taskHelpers';
 import type { TaskType } from '@/types';
 
 /**
@@ -57,7 +58,8 @@ export function TaskComposer() {
         description: '',
         type,
         priority,
-        ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+        // Local midnight, so the day the admin picked is the day that's stored.
+        ...(dueDate ? { dueDate: (fromDateInput(dueDate) ?? new Date(dueDate)).toISOString() } : {}),
         assignedTo: assignees.length === 1 ? assignees[0] : assignees,
       });
       toast.success(res.count > 1 ? `Assigned to ${res.count} people` : 'Task assigned');
@@ -105,12 +107,12 @@ export function TaskComposer() {
         </select>
 
         <input
-          aria-label="Due date and time"
-          type="datetime-local"
+          aria-label="Due date"
+          type="date"
           value={dueDate}
-          min={localDateTimeInput()}
+          min={localDateInput()}
           onChange={(e) => setDueDate(e.target.value)}
-          className={`${cell} w-48 shrink-0`}
+          className={`${cell} w-40 shrink-0`}
         />
 
         <select
