@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useOverview } from '@/api/reports';
+import { useIsMobile } from '@/lib/useMediaQuery';
 import { Card, Spinner, StatCard } from '@/components/ui/Misc';
 import { LEAD_STATUS_LABELS } from '@/lib/constants';
 import type { LeadStatus } from '@/types';
@@ -20,6 +21,7 @@ const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#647
 
 export function SuperadminDashboard() {
   const { data, isLoading } = useOverview();
+  const isMobile = useIsMobile();
   if (isLoading || !data) return <Spinner />;
 
   const statusData = data.leadsByStatus.map((s) => ({
@@ -31,7 +33,7 @@ export function SuperadminDashboard() {
     <div className="space-y-5">
       <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
         <StatCard
           label="Users"
           value={data.totalTelecallers}
@@ -46,7 +48,7 @@ export function SuperadminDashboard() {
           sub={`${data.convertedLeads} converted`}
           icon={<TrendingUp size={18} />}
         />
-        <Link to="/tasks">
+        <Link to="/tasks" className="block h-full">
           <StatCard
             label="Open Tasks"
             value={data.pendingTasks}
@@ -59,9 +61,15 @@ export function SuperadminDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Leads by status</h2>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 240}>
             <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" outerRadius={90} label>
+              <Pie
+                data={statusData}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={isMobile ? 70 : 90}
+                label={!isMobile}
+              >
                 {statusData.map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
@@ -69,6 +77,18 @@ export function SuperadminDashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+          {/* Slice labels don't fit on a phone, so the breakdown is spelled out. */}
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
+            {statusData.map((s, i) => (
+              <span key={s.name} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                />
+                {s.name} <b className="text-slate-700 dark:text-slate-200">{s.value}</b>
+              </span>
+            ))}
+          </div>
         </Card>
 
         <Card className="p-4">
@@ -76,8 +96,8 @@ export function SuperadminDashboard() {
           {data.perTelecaller.length === 0 ? (
             <p className="py-16 text-center text-sm text-slate-400 dark:text-slate-500">No calls logged today</p>
           ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.perTelecaller}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 240}>
+              <BarChart data={data.perTelecaller} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" fontSize={11} />
                 <YAxis fontSize={11} allowDecimals={false} />
                 <Tooltip />
@@ -90,7 +110,33 @@ export function SuperadminDashboard() {
 
       <Card className="p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">User performance (today)</h2>
-        <div className="overflow-x-auto">
+
+        {/* Phone: one block per user. */}
+        <div className="space-y-3 md:hidden">
+          {data.perTelecaller.length === 0 && (
+            <p className="py-4 text-center text-sm text-slate-400">No activity yet today</p>
+          )}
+          {data.perTelecaller.map((t) => {
+            const pct = t.dailyTarget ? Math.round((t.calls / t.dailyTarget) * 100) : 0;
+            return (
+              <div key={t._id}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {t.name}
+                  </span>
+                  <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                    {t.calls} / {t.dailyTarget} · {pct}%
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase text-slate-400 dark:text-slate-500">

@@ -62,7 +62,7 @@ export function SaveCustomContactModal({
       title="Save as contact?"
       size="sm"
       footer={
-        <div className="flex justify-end gap-2">
+        <div className="flex gap-2 [&>*]:flex-1 sm:justify-end sm:[&>*]:flex-none">
           <Button variant="secondary" onClick={onDone} disabled={save.isPending}>
             Skip
           </Button>
@@ -94,7 +94,7 @@ export function SaveCustomContactModal({
           <FieldError>{nameError}</FieldError>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="cc-company">Company</Label>
             <Input id="cc-company" value={company} onChange={(e) => setCompany(e.target.value)} />

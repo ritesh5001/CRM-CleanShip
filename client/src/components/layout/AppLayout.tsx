@@ -1,6 +1,14 @@
-import { useEffect } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Phone, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LogOut,
+  Phone,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+  Moon,
+  MoreHorizontal,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
 import { useWorkspaceStore } from '@/store/workspace';
@@ -8,7 +16,8 @@ import { useCallProvider } from '@/features/calls/useCallProvider';
 import { useCallStore } from '@/store/call';
 import { CallBar } from '@/features/calls/CallBar';
 import { CallDispositionModal } from '@/features/calls/CallDispositionModal';
-import { NAV } from './nav';
+import { Sheet } from '@/components/ui/Sheet';
+import { MOBILE_PRIMARY, NAV, type NavItem } from './nav';
 import { NotificationBell } from './NotificationBell';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
@@ -28,8 +37,24 @@ export function AppLayout() {
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const navigate = useNavigate();
+  const location = useLocation();
   const clearWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const items = user ? NAV[user.role] : [];
+
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // A tab-bar destination shouldn't leave the sheet hanging over the new page.
+  useEffect(() => setMoreOpen(false), [location.pathname]);
+
+  const primaryRoutes = user ? MOBILE_PRIMARY[user.role] : [];
+  const tabs = primaryRoutes
+    .map((to) => items.find((i) => i.to === to))
+    .filter((i): i is NavItem => !!i);
+  // Anything not on the tab bar is only reachable through More — highlight the
+  // More button itself so the user still knows where they are.
+  const moreIsActive = !tabs.some(
+    (t) => location.pathname === t.to || (t.to !== '/' && location.pathname.startsWith(t.to))
+  );
 
   function handleLogout() {
     logout();
@@ -94,16 +119,19 @@ export function AppLayout() {
         </button>
       </aside>
 
-      {/* Main area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+      {/* Main area. min-w-0 so a wide table scrolls inside its own container
+          instead of stretching the whole layout sideways. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900 sm:px-4 sm:py-3">
           <WorkspaceSwitcher />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
+            {/* On a phone the theme switch lives in the More sheet — the header
+                only has room for what's needed while working. */}
             <button
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               aria-label="Toggle dark mode"
-              className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              className="hidden rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 md:block"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -112,44 +140,92 @@ export function AppLayout() {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{user?.name}</p>
               <p className="text-xs text-slate-400 dark:text-slate-500">{user?.email}</p>
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
               {user?.name?.[0]?.toUpperCase()}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4">
+        <main className="overscroll-none-y pb-navbar min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 md:pb-4">
           <Outlet />
         </main>
 
-        {/* Mobile bottom nav */}
-        <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:hidden">
-          {items.map((item) => (
+        {/* Mobile tab bar: four destinations + More. */}
+        <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-slate-200 bg-white pb-safe dark:border-slate-800 dark:bg-slate-900 md:hidden">
+          {tabs.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${
+                `flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
                   isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'
                 }`
               }
             >
               <item.icon size={20} />
-              {item.label}
+              <span className="max-w-full truncate px-0.5">{item.shortLabel ?? item.label}</span>
             </NavLink>
           ))}
           <button
-            onClick={handleLogout}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 dark:text-slate-400"
+            onClick={() => setMoreOpen(true)}
+            aria-label="More"
+            aria-expanded={moreOpen}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+              moreIsActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'
+            }`}
           >
-            <LogOut size={20} />
-            Logout
+            <MoreHorizontal size={20} />
+            More
           </button>
         </nav>
       </div>
 
-      {/* Global Twilio softphone UI (no-op until a call is placed). */}
+      {/* The full nav, plus the account actions the header drops on a phone. */}
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Menu">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              onClick={() => setMoreOpen(false)}
+              className={({ isActive }) =>
+                `flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl border p-2 text-center text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
+                    : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`
+              }
+            >
+              <item.icon size={20} />
+              <span className="leading-tight">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-1 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <div className="px-1 pb-2">
+            <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{user?.name}</p>
+            <p className="truncate text-xs text-slate-400 dark:text-slate-500">{user?.email}</p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="tap flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="tap flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          >
+            <LogOut size={18} /> Log out
+          </button>
+        </div>
+      </Sheet>
+
+      {/* Global softphone UI (no-op until a call is placed). */}
       <CallBar />
       <CallDispositionModal />
     </div>

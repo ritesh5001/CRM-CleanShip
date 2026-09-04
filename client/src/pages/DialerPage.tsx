@@ -72,7 +72,7 @@ export function DialerPage() {
         <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-slate-100">
           <Phone size={20} /> Dialer
         </h1>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
           Call any number. You can save it as a contact after the call.
         </p>
       </div>
@@ -87,8 +87,8 @@ export function DialerPage() {
       {/* Choose the backend (and, for TeleCMI, browser vs ring-my-phone). */}
       {(telecmiReady || provider === 'telecmi') && <ProviderSwitcher />}
 
-      <Card className="mx-auto max-w-xs p-4">
-        <div className="mb-3">
+      <Card className="mx-auto w-full max-w-sm p-3 sm:max-w-xs sm:p-4">
+        <div className="mb-2 sm:mb-3">
           <input
             value={number}
             onChange={(e) => setNumber(e.target.value)}
@@ -113,7 +113,7 @@ export function DialerPage() {
 
         <Keypad longPressPlus disabled={callActive} onPress={addChar} />
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2 sm:mt-3 [&>button]:min-h-12">
           {/* A '+' is required for any international number, and long-pressing 0
               (the phone convention) isn't discoverable on its own. */}
           <Button

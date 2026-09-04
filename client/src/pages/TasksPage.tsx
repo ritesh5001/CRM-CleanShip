@@ -149,7 +149,7 @@ export function TasksPage() {
     <div className="space-y-3">
       <div>
         <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{isAdmin ? 'Tasks' : 'My Tasks'}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
           {isAdmin
             ? 'Assign work to your users and see exactly when it got done.'
             : 'Everything assigned to you. Tick it off and say when you did it.'}
@@ -189,13 +189,15 @@ export function TasksPage() {
       {/* Assigning happens right here — no dialog. */}
       {isAdmin && <TaskComposer />}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="space-y-2 md:flex md:flex-wrap md:items-center md:gap-2 md:space-y-0">
+        {/* Swipeable on a phone, wrapped on desktop — either way the four tabs
+            stay on one line instead of stealing two rows from the list. */}
+        <div className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 md:mx-0 md:flex-wrap md:px-0">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`min-h-11 shrink-0 whitespace-nowrap rounded-lg px-4 text-sm font-medium transition-colors md:min-h-0 md:px-3 md:py-1.5 ${
                 tab === t.key
                   ? 'bg-brand-600 text-white'
                   : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -206,57 +208,64 @@ export function TasksPage() {
           ))}
         </div>
 
-        <div className="relative min-w-40 flex-1">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={15} aria-hidden />
+        <div className="relative md:min-w-40 md:flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+            aria-hidden
+          />
           <input
             aria-label="Search tasks"
-            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-500/25"
+            type="search"
+            className="min-h-11 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-500/25 md:min-h-0"
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             placeholder="Search tasks…"
           />
         </div>
 
-        {isAdmin && (
+        <div className="grid grid-cols-2 gap-2 md:contents">
+          {isAdmin && (
+            <select
+              aria-label="Filter by assignee"
+              className="col-span-2 min-h-11 w-full truncate rounded-lg border border-slate-300 bg-white py-2 pl-2 pr-7 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 md:col-span-1 md:min-h-0 md:w-40 md:shrink-0 md:pr-2"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+            >
+              <option value="">Everyone</option>
+              {telecallers?.data.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select
-            aria-label="Filter by assignee"
-            className="w-40 shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
+            aria-label="Filter by due date"
+            className="min-h-11 w-full truncate rounded-lg border border-slate-300 bg-white py-2 pl-2 pr-7 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 md:pr-2 md:min-h-0 md:w-36 md:shrink-0"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
           >
-            <option value="">Everyone</option>
-            {telecallers?.data.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name}
+            {SCOPES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
-        )}
 
-        <select
-          aria-label="Filter by due date"
-          className="w-36 shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          value={scope}
-          onChange={(e) => setScope(e.target.value)}
-        >
-          {SCOPES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          aria-label="Filter by priority"
-          className="w-32 shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-        >
-          <option value="">Any priority</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+          <select
+            aria-label="Filter by priority"
+            className="min-h-11 w-full truncate rounded-lg border border-slate-300 bg-white py-2 pl-2 pr-7 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 md:pr-2 md:min-h-0 md:w-32 md:shrink-0"
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+          >
+            <option value="">Any priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
       </div>
 
       {isLoading && !data ? (

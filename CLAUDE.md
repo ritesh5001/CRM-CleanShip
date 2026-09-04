@@ -197,7 +197,7 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 - Routing in `routes/router.tsx`; guards `ProtectedRoute` / `RoleRoute` in `routes/guards.tsx`.
 - Role-aware pages (`pages/*`) branch on `useAuthStore().user.role`; the dashboard renders
   `SuperadminDashboard` or `TelecallerDashboard`.
-- Reusable UI in `components/ui/` (Button, Field, Modal, Misc). Feature modals in `features/*`.
+- Reusable UI in `components/ui/` (Button, Field, Modal, Misc, Sheet). Feature modals in `features/*`.
 - Formatting/click-to-call helpers in `lib/format.ts`; label/color maps in `lib/constants.ts`.
   Country dialling codes/timezones/ISO in `lib/countries.ts`; `<CountryTime>`
   (`components/CountryTime.tsx`) shows a country's live local time (contacts Location cell).
@@ -206,6 +206,52 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
   `toE164(raw, country, defaultCode)` for dialling — parses with the contact's country so a number
   that already includes the country code without '+' (e.g. `14102927721`) isn't double-prefixed.
 - `@/` is aliased to `client/src/`.
+
+## Mobile (the app is used on phones)
+
+Every screen and every action has to work one-handed on a ~390px phone. The rule
+is **one layout per breakpoint at `md` (768px)** — the desktop density is kept
+behind `md:`, and the phone gets a purpose-built layout rather than a squeezed
+copy. `lib/useMediaQuery.ts` (`useIsMobile()`) is for the cases where that means
+rendering a *different component*, not a different style; everything else is
+Tailwind breakpoints.
+
+- **Navigation** (`components/layout/AppLayout.tsx`): desktop keeps the sidebar;
+  the phone gets a five-slot tab bar — the four routes in `MOBILE_PRIMARY[role]`
+  (`components/layout/nav.ts`) plus **More**, a `Sheet` holding the *complete*
+  nav, the account row, the theme switch and Log out. Nine tabs do not fit
+  across a phone, so anything not in `MOBILE_PRIMARY` is one tap away, never
+  gone. Add a new route to `NAV` and it appears in More automatically.
+- **Tables become cards.** `ContactsTable` and `TaskTable` each render a card
+  list under `md:hidden` and the table under `hidden md:block` — the same data
+  and the same mutations, laid out vertically. The contacts card carries the
+  whole call workflow (number, call/WhatsApp/copy/edit, call status, lead
+  outcome, remark) per phone slot, with phone 2/3 folded behind a count.
+- **Safe areas & the tab bar.** `main` uses `pb-navbar` and the tab bar `pb-safe`
+  (both in `index.css`) so content clears the bar and the iPhone home indicator.
+  `CallBar` floats *above* the tab bar on a phone so navigation stays reachable
+  mid-call.
+- **iOS never auto-zooms:** `index.css` forces `font-size:16px` on every
+  `input`/`select`/`textarea` under 768px. Safari zooms the page whenever a
+  focused control is smaller than that and never zooms back — with this app's
+  wall of inline `text-xs` controls that was the single worst phone bug. The
+  dense desktop table is `hidden` at that width, so nothing there is affected.
+- **Touch targets:** `Button`'s `sm`/`md` sizes carry a phone minimum that
+  resets at `md:`; the `Field` primitives get `min-h-11 md:min-h-0`; bespoke
+  icon buttons use the `.tap` utility (44px, `pointer: coarse` only).
+- **Overlays:** `components/ui/Sheet.tsx` is the phone-native bottom sheet (nav
+  overflow, contact filters) and exports `useBodyScrollLock`, which `Modal` also
+  uses — without it iOS scrolls the page behind the sheet. `Modal` already
+  renders as a bottom sheet under `sm`; its footer buttons go full-width there.
+- **Expanding a row scrolls it into view** (task completion strip, contact
+  detail) — otherwise the panel opens below the fold and the tap looks dead.
+- **Colour maps in `lib/constants.ts` must carry `dark:` pairs.** On desktop
+  they're small badges; on a phone card they are full-width selects, so a
+  missing dark variant is a white block on a dark screen.
+- **Verifying:** drive it with Playwright at `devices['iPhone 13']` and at a
+  360px viewport, and assert `documentElement.scrollWidth <= clientWidth` on
+  every route — horizontal page overflow is always a bug (wide content scrolls
+  inside its own `overflow-x-auto` container).
 
 ## Commands
 

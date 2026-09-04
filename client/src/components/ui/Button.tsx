@@ -18,9 +18,11 @@ const variants: Record<Variant, string> = {
   ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
 };
 
+// Buttons are roomier on phones and snap back to the dense desktop metrics at
+// `md` — the same breakpoint where the tables and sidebar come back.
 const sizes: Record<Size, string> = {
-  sm: 'px-2.5 py-1.5 text-xs',
-  md: 'px-4 py-2 text-sm',
+  sm: 'min-h-9 px-3 py-2 text-xs md:min-h-0 md:px-2.5 md:py-1.5',
+  md: 'min-h-11 px-4 py-2.5 text-sm md:min-h-0 md:py-2',
 };
 
 export function Button({
@@ -34,12 +36,12 @@ export function Button({
 }: Props) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
       {...rest}
     >
       {loading && (
-        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
       )}
       {children}
     </button>

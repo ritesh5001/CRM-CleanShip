@@ -69,36 +69,53 @@ export function RecentsPage() {
               const number =
                 formatPhoneDisplay(c.phoneNumber || lead?.phone) || (c.phone ? SLOT_LABEL[c.phone] : '');
               return (
-                <div key={c._id} className="flex flex-wrap items-center gap-3 p-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
-                    {lead?.name ? lead.name[0].toUpperCase() : <Phone size={15} />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    {/* A custom dial has no contact — lead with the number itself
-                        rather than an anonymous "unknown". */}
-                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">
-                      {lead?.name ?? number ?? 'Unknown contact'}
-                    </p>
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {lead ? number : 'Not saved as a contact'}
-                      {isAdmin && telecallerName(c) ? ` · by ${telecallerName(c)}` : ''}
-                    </p>
+                <div key={c._id} className="p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+                      {lead?.name ? lead.name[0].toUpperCase() : <Phone size={15} />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      {/* A custom dial has no contact — lead with the number itself
+                          rather than an anonymous "unknown". */}
+                      <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                        {lead?.name ?? number ?? 'Unknown contact'}
+                      </p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {lead ? number : 'Not saved as a contact'}
+                        {isAdmin && telecallerName(c) ? ` · by ${telecallerName(c)}` : ''}
+                      </p>
+                      {/* On a phone the outcome sits under the name instead of in
+                          a right-hand column that squeezes it to two words wide. */}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+                        <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {callLogOutcomeLabel(c.disposition, c.callStatus)}
+                        </Badge>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                          {fmtDuration(c.durationSec)} · {fmtRelative(c.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="hidden shrink-0 text-right sm:block">
+                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {callLogOutcomeLabel(c.disposition, c.callStatus)}
+                      </Badge>
+                      <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500" title={fmtDateTime(c.createdAt)}>
+                        {fmtDuration(c.durationSec)} · {fmtRelative(c.createdAt)}
+                      </p>
+                    </div>
+                    <div className="hidden sm:block">
+                      {c.recordingUrl ? (
+                        <RecordingPlayer callId={c._id} />
+                      ) : (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">No recording</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {callLogOutcomeLabel(c.disposition, c.callStatus)}
-                    </Badge>
-                    <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500" title={fmtDateTime(c.createdAt)}>
-                      {fmtDuration(c.durationSec)} · {fmtRelative(c.createdAt)}
-                    </p>
-                  </div>
-                  <div className="w-full sm:w-auto">
-                    {c.recordingUrl ? (
+                  {c.recordingUrl && (
+                    <div className="mt-2 sm:hidden">
                       <RecordingPlayer callId={c._id} />
-                    ) : (
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">No recording</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

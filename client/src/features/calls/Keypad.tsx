@@ -37,7 +37,9 @@ export function Keypad({
   size?: 'sm' | 'md';
   longPressPlus?: boolean;
 }) {
-  const pad = size === 'sm' ? 'py-2' : 'py-3';
+  // Roomier keys on a phone — this is the one control people aim at while
+  // holding the device one-handed.
+  const pad = size === 'sm' ? 'py-2.5 md:py-2' : 'py-3';
   const timer = useRef<number | null>(null);
   const firedPlus = useRef(false);
 
@@ -81,9 +83,9 @@ export function Keypad({
             onContextMenu={(e) => plusKey && e.preventDefault()}
             aria-label={plusKey ? 'Key 0, hold for plus' : `Key ${digit}`}
             title={plusKey ? 'Hold for +' : undefined}
-            className={`flex select-none flex-col items-center justify-center rounded-lg border border-slate-200 bg-white ${pad} leading-none transition-colors hover:bg-slate-50 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700`}
+            className={`flex touch-manipulation select-none flex-col items-center justify-center rounded-lg border border-slate-200 bg-white ${pad} leading-none transition-colors hover:bg-slate-50 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700`}
           >
-            <span className="text-lg font-semibold text-slate-800 dark:text-slate-100">{digit}</span>
+            <span className="text-xl font-semibold text-slate-800 dark:text-slate-100 md:text-lg">{digit}</span>
             {letters && (
               <span className="mt-0.5 text-[9px] font-medium tracking-wider text-slate-400 dark:text-slate-500">
                 {letters}

@@ -155,7 +155,7 @@ function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[])
           <button
             type="button"
             onClick={() => onChange(tags.filter((x) => x !== t))}
-            className="text-brand-400 hover:text-brand-700 dark:hover:text-brand-200"
+            className="-mr-1 rounded-full p-1 text-brand-400 hover:text-brand-700 dark:hover:text-brand-200"
             aria-label={`Remove tag ${t}`}
           >
             <X size={12} />
@@ -322,10 +322,11 @@ export function ContactFormModal({ open, onClose, lead }: Props) {
       title={isEdit ? `Edit ${lead!.name}` : 'Add contact'}
       footer={
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+          {/* The keyboard hint only means something where there's a keyboard. */}
+          <span className="hidden text-[11px] text-slate-400 dark:text-slate-500 sm:block">
             {isEdit && !dirty ? 'No changes yet' : <>Press <kbd className="rounded border border-slate-300 px-1 dark:border-slate-600">⌘</kbd>+<kbd className="rounded border border-slate-300 px-1 dark:border-slate-600">Enter</kbd> to save</>}
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-1 gap-2 [&>*]:flex-1 sm:flex-none sm:[&>*]:flex-none">
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>

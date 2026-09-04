@@ -135,8 +135,11 @@ function FollowUpCell({ lead }: { lead: Lead }) {
  *  which app to dial with). Only when Twilio isn't set up at all do we fall back
  *  to `tel:`. */
 function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; lead?: Lead; slot?: PhoneSlot; big?: boolean }) {
-  const size = big ? 16 : 15;
-  const cls = big ? 'rounded-lg p-2' : 'rounded p-1.5';
+  const size = big ? 18 : 15;
+  // `big` is the phone layout: real 44px targets, not 28px desktop icon buttons.
+  const cls = big
+    ? 'tap flex items-center justify-center rounded-xl border border-slate-200 p-2.5 dark:border-slate-700'
+    : 'rounded p-1.5';
   const { config: callConfig, ready: callingEnabled, provider: callProvider } = useCallProvider();
   // "Configured but no number/agent assigned to you" — a gap an admin can fix.
   const needsCallerId =
@@ -146,7 +149,7 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
   const startCall = useCallStore((s) => s.startCall);
   const phase = useCallStore((s) => s.phase);
   const busy = phase === 'connecting' || phase === 'ringing' || phase === 'in_call';
-  const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'bg-brand-50' : ''}`;
+  const callCls = `${cls} text-brand-600 hover:bg-brand-50 ${big ? 'border-brand-200 bg-brand-50 dark:border-brand-500/40 dark:bg-brand-500/15' : ''}`;
   // Parse with the contact's country (handles missing '+'), else admin default code.
   const dialNumber = toE164(phone, lead?.country, callConfig?.defaultCountryCode);
 
@@ -184,14 +187,14 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <div className="flex w-full items-center gap-1" onClick={(e) => e.stopPropagation()}>
         <input
           autoFocus
           value={val}
           onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && saveNumber()}
           placeholder="+countrycode number"
-          className="w-36 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 md:w-36 md:flex-none"
         />
         <button onClick={saveNumber} disabled={updateLead.isPending} title="Save" className={`${cls} text-emerald-600 hover:bg-emerald-50`}>
           <Check size={size} />
@@ -204,7 +207,10 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
   }
 
   return (
-    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`flex items-center gap-1.5 ${big ? '[&>*]:flex-1' : 'shrink-0'}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       <button
         onClick={() => copyPhone(phone)}
         title="Copy number"
@@ -234,7 +240,7 @@ function PhoneActions({ phone, lead, slot = 'phone1', big }: { phone: string; le
         href={whatsappLink(phone)}
         target="_blank"
         rel="noreferrer"
-        className={`${cls} text-emerald-600 hover:bg-emerald-50 ${big ? 'bg-emerald-50' : ''}`}
+        className={`${cls} text-emerald-600 hover:bg-emerald-50 ${big ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/15' : ''}`}
       >
         <MessageCircle size={size} />
       </a>
@@ -579,22 +585,25 @@ function resolveOrder(stored: string[]): string[] {
   return [...valid, ...missing];
 }
 
-/** Top-bar toggle that reveals/hides the phone number digits in the table's phone columns. */
-export function ShowNumbersToggle() {
+/** Toggle that reveals/hides the phone number digits, in the desktop top bar and
+ *  (as `full`) in the phone filter sheet, where it applies to the mobile cards. */
+export function ShowNumbersToggle({ full }: { full?: boolean } = {}) {
   const show = useUiStore((s) => s.showPhoneNumbers);
   const toggle = useUiStore((s) => s.toggleShowPhoneNumbers);
   return (
     <button
       onClick={toggle}
       title={show ? 'Hide phone numbers' : 'Show phone numbers'}
-      className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+      className={`flex items-center gap-1 rounded-lg border font-medium transition-colors ${
+        full ? 'min-h-11 w-full justify-center px-3 py-2 text-sm' : 'shrink-0 px-2.5 py-1.5 text-xs'
+      } ${
         show
           ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/15 dark:text-brand-300'
           : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
       }`}
     >
-      {show ? <Eye size={13} /> : <EyeOff size={13} />}
-      Numbers
+      {show ? <Eye size={full ? 15 : 13} /> : <EyeOff size={full ? 15 : 13} />}
+      {full ? (show ? 'Numbers shown' : 'Numbers hidden') : 'Numbers'}
     </button>
   );
 }
@@ -911,7 +920,7 @@ function AssignSelect({
         const t = telecallers.find((x) => x._id === e.target.value);
         if (t) onAssign?.(lead._id, t._id, t.name);
       }}
-      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+      className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 md:min-h-0"
     >
       <option value="">Assign…</option>
       {telecallers.map((t) => (
@@ -946,30 +955,6 @@ function PriorityCell({ lead, isAdmin }: { lead: Lead; isAdmin: boolean }) {
         </option>
       ))}
     </select>
-  );
-}
-
-/** Compact read-only call-status badges shown in the table's Outcome column. */
-function PhoneSummaryBadges({ lead }: { lead: Lead }) {
-  const p1 = lead.phone1Outcome?.callStatus ?? 'pending';
-  const p2 = lead.phone2Outcome?.callStatus ?? 'pending';
-  const p3 = lead.phone3Outcome?.callStatus ?? 'pending';
-  return (
-    <div className="space-y-0.5">
-      <Badge className={`${PHONE_CALL_STATUS_COLORS[p1]} text-[10px]`}>
-        P1: {PHONE_CALL_STATUS_LABELS[p1]}
-      </Badge>
-      {lead.altPhone && (
-        <Badge className={`${PHONE_CALL_STATUS_COLORS[p2]} text-[10px]`}>
-          P2: {PHONE_CALL_STATUS_LABELS[p2]}
-        </Badge>
-      )}
-      {lead.altPhone2 && (
-        <Badge className={`${PHONE_CALL_STATUS_COLORS[p3]} text-[10px]`}>
-          P3: {PHONE_CALL_STATUS_LABELS[p3]}
-        </Badge>
-      )}
-    </div>
   );
 }
 
@@ -1099,49 +1084,17 @@ function PhoneOutcomePanel({
   );
 }
 
-function RemarkCell({ lead }: { lead: Lead }) {
-  const [text, setText] = useState('');
-  const addRemark = useAddRemark();
-  const last = lead.remarks?.[lead.remarks.length - 1];
-
-  function submit() {
-    const t = text.trim();
-    if (!t) return;
-    setText('');
-    addRemark.mutate({ id: lead._id, text: t }, { onError: (e) => toast.error(apiError(e)) });
-  }
-
-  return (
-    <div onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-1">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Add remark…"
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-        />
-        <button onClick={submit} className="rounded p-1 text-brand-600 hover:bg-brand-50" title="Add remark">
-          <Send size={13} />
-        </button>
-      </div>
-      {last && (
-        <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-slate-400" title={last.text}>
-          {lead.remarks!.length}× · {last.text}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function ExpandedDetail({
   lead,
   isAdmin,
   onEdit,
+  compact,
 }: {
   lead: Lead;
   isAdmin: boolean;
   onEdit?: (lead: Lead) => void;
+  /** Mobile: the card above already shows the per-phone panels — don't repeat them. */
+  compact?: boolean;
 }) {
   const del = useDeleteLead();
   const loc = location(lead);
@@ -1155,13 +1108,15 @@ function ExpandedDetail({
   }
 
   return (
-    <div className="space-y-4 bg-slate-50 p-4 dark:bg-slate-900/50">
+    <div className="space-y-4 bg-slate-50 p-3 dark:bg-slate-900/50 sm:p-4">
       {/* Per-phone call tracking */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <PhoneOutcomePanel lead={lead} phone="phone1" isAdmin={isAdmin} />
-        {lead.altPhone && <PhoneOutcomePanel lead={lead} phone="phone2" isAdmin={isAdmin} />}
-        {lead.altPhone2 && <PhoneOutcomePanel lead={lead} phone="phone3" isAdmin={isAdmin} />}
-      </div>
+      {!compact && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <PhoneOutcomePanel lead={lead} phone="phone1" isAdmin={isAdmin} />
+          {lead.altPhone && <PhoneOutcomePanel lead={lead} phone="phone2" isAdmin={isAdmin} />}
+          {lead.altPhone2 && <PhoneOutcomePanel lead={lead} phone="phone3" isAdmin={isAdmin} />}
+        </div>
+      )}
 
       {/* Contact details, timestamps, and full remarks timeline */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -1302,10 +1257,130 @@ function Row({
 
 /* ------------------------------ mobile card ------------------------------ */
 
+/**
+ * One contact, sized for a thumb. The desktop grid packs 24 columns behind a
+ * horizontal scrollbar; on a phone that same information is layered instead —
+ * identity and status up front, then one block per phone number carrying the
+ * actions and the two outcome dropdowns that make up the actual call workflow,
+ * then everything else behind the expander.
+ */
+function MobilePhoneBlock({ lead, slot }: { lead: Lead; slot: PhoneSlot }) {
+  const num = phoneNumberOf(lead, slot);
+  const outcome = phoneSlotOf(lead, slot);
+  const showNumbers = useUiStore((s) => s.showPhoneNumbers);
+  const update = useUpdatePhoneOutcome();
+  const [remark, setRemark] = useState('');
+  const [showRemark, setShowRemark] = useState(false);
+
+  const phoneRemarks = (lead.remarks ?? []).filter((r) => r.phone === slot || (slot === 'phone1' && !r.phone));
+  const last = phoneRemarks[phoneRemarks.length - 1];
+  const callStatus = (outcome?.callStatus ?? 'pending') as PhoneCallStatus;
+  const leadOutcome = (outcome?.leadOutcome ?? 'none') as PhoneLeadOutcome;
+  const label = slot === 'phone1' ? 'Phone 1' : slot === 'phone2' ? 'Phone 2' : 'Phone 3';
+
+  if (!num) return null;
+
+  function submitRemark() {
+    const t = remark.trim();
+    if (!t) return;
+    setRemark('');
+    setShowRemark(false);
+    update.mutate({ id: lead._id, phone: slot, remark: t }, { onError: (e) => toast.error(apiError(e)) });
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 dark:border-slate-700 dark:bg-slate-800/40">
+      <div className="flex items-baseline gap-2">
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {label}
+        </span>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+          {showNumbers ? formatPhoneDisplay(num, lead.country) : '•••• ••••'}
+        </p>
+      </div>
+      <div className="mt-1.5">
+        <PhoneActions phone={num} lead={lead} slot={slot} big />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <select
+          aria-label={`Call status for ${label}`}
+          value={callStatus}
+          onChange={(e) =>
+            update.mutate(
+              { id: lead._id, phone: slot, callStatus: e.target.value as PhoneCallStatus },
+              { onError: (err) => toast.error(apiError(err)) }
+            )
+          }
+          className={`min-h-11 w-full truncate rounded-lg border border-slate-300 py-2 pl-2 pr-7 font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_CALL_STATUS_COLORS[callStatus]}`}
+        >
+          <option value="pending">Not Called</option>
+          <option value="connected">Connected</option>
+          <option value="not_connected">Not Connected</option>
+          <option value="voicemail">Voice Mail</option>
+          <option value="incorrect_no">Incorrect No</option>
+        </select>
+        <select
+          aria-label={`Lead status for ${label}`}
+          value={leadOutcome}
+          onChange={(e) =>
+            update.mutate(
+              { id: lead._id, phone: slot, leadOutcome: e.target.value as PhoneLeadOutcome },
+              { onError: (err) => toast.error(apiError(err)) }
+            )
+          }
+          className={`min-h-11 w-full truncate rounded-lg border border-slate-300 py-2 pl-2 pr-7 font-medium outline-none focus:border-brand-500 dark:border-slate-600 ${PHONE_LEAD_OUTCOME_COLORS[leadOutcome]}`}
+        >
+          <option value="none">No outcome</option>
+          <option value="interested">Interested</option>
+          <option value="not_interested">Not Interested</option>
+        </select>
+      </div>
+
+      {outcome?.lastCalledAt && (
+        <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500" title={fmtDateTime(outcome.lastCalledAt)}>
+          Called {fmtRelative(outcome.lastCalledAt)}
+        </p>
+      )}
+
+      {/* The remark box only unfolds when it's wanted — otherwise three of them
+          would push the next contact off the screen. */}
+      {showRemark ? (
+        <div className="mt-2 flex items-center gap-1.5">
+          <input
+            autoFocus
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitRemark()}
+            placeholder={`Remark for ${label}…`}
+            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+          />
+          <button
+            onClick={submitRemark}
+            aria-label="Save remark"
+            className="tap flex items-center justify-center rounded-lg bg-brand-600 px-3 text-white"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowRemark(true)}
+          className="mt-2 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-2.5 py-2 text-left text-xs text-slate-500 dark:border-slate-600 dark:text-slate-400"
+        >
+          <Send size={12} className="shrink-0" />
+          <span className="truncate">
+            {last ? `${phoneRemarks.length}× · ${last.text}` : 'Add a remark'}
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MobileCard({
   lead,
   isAdmin,
-  role,
   selectable,
   selected,
   onToggle,
@@ -1324,47 +1399,103 @@ function MobileCard({
   onEdit?: (lead: Lead) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [showAllPhones, setShowAllPhones] = useState(false);
+  // The detail panel opens below a tall card — pull it into view so the tap
+  // visibly does something.
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [open]);
+  const loc = location(lead);
+  const assignee = (lead.assignedTo as User | undefined)?.name;
+  const extraSlots = (['phone2', 'phone3'] as PhoneSlot[]).filter((sl) => !!phoneNumberOf(lead, sl));
 
   return (
     <div className="p-3">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2.5">
         {selectable && (
-          <input type="checkbox" className="mt-1 h-4 w-4" checked={selected} onChange={() => onToggle(lead._id)} />
+          <label className="tap -m-1 flex shrink-0 items-start p-1 pt-2">
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={selected}
+              onChange={() => onToggle(lead._id)}
+              aria-label={`Select ${lead.name}`}
+            />
+          </label>
         )}
+
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-medium text-slate-800 dark:text-slate-100">{lead.name}</p>
-            {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
-            {onEdit && (
-              <button
-                onClick={() => onEdit(lead)}
-                title="Edit all details"
-                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-          </div>
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {formatPhoneDisplay(lead.phone, lead.country)}
-            {lead.company ? ` · ${lead.company}` : ''}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <PhoneActions phone={lead.phone} lead={lead} slot="phone1" big />
-            {isAdmin && onAssign && <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />}
-            <PhoneSummaryBadges lead={lead} />
-            <button onClick={() => setOpen((o) => !o)} className="ml-auto text-slate-400">
-              {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold text-slate-800 dark:text-slate-100">{lead.name}</p>
+              {(lead.company || lead.title) && (
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  {[lead.title, lead.company].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {loc && <p className="truncate text-xs text-slate-400 dark:text-slate-500">{loc}</p>}
+            </div>
+            <button
+              onClick={() => setOpen((o) => !o)}
+              aria-label={open ? 'Hide details' : 'Show details'}
+              aria-expanded={open}
+              className="tap -mr-1 flex shrink-0 items-center justify-center rounded-lg text-slate-400"
+            >
+              {open ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             </button>
           </div>
-          <div className="mt-2">
-            <RemarkCell lead={lead} />
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Badge className={LEAD_STATUS_COLORS[lead.status]}>{LEAD_STATUS_LABELS[lead.status]}</Badge>
+            {lead.qualified && <Badge className="bg-green-600 text-white">Lead</Badge>}
+            <Badge className={PRIORITY_COLORS[lead.priority]}>{lead.priority}</Badge>
+            {assignee && (
+              <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{assignee}</Badge>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Phone 1 is the working number and stays open; the alternates fold away
+          so one contact doesn't fill the whole screen. */}
+      <div className="mt-2.5 space-y-2">
+        <MobilePhoneBlock lead={lead} slot="phone1" />
+        {extraSlots.length > 0 &&
+          (showAllPhones ? (
+            extraSlots.map((slot) => <MobilePhoneBlock key={slot} lead={lead} slot={slot} />)
+          ) : (
+            <button
+              onClick={() => setShowAllPhones(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 text-xs font-medium text-slate-500 dark:border-slate-600 dark:text-slate-400"
+            >
+              <Phone size={13} /> {extraSlots.length} more number{extraSlots.length > 1 ? 's' : ''}
+            </button>
+          ))}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        {isAdmin && onAssign && (
+          <div className="min-w-0 flex-1">
+            <AssignSelect lead={lead} telecallers={telecallers} onAssign={onAssign} />
+          </div>
+        )}
+        {onEdit && (
+          <button
+            onClick={() => onEdit(lead)}
+            className="tap flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-600 dark:border-slate-600 dark:text-slate-300"
+          >
+            <Pencil size={14} /> Edit
+          </button>
+        )}
+      </div>
+
       {open && (
-        <div className="mt-2 overflow-hidden rounded-lg">
-          <ExpandedDetail lead={lead} isAdmin={isAdmin} onEdit={onEdit} />
+        <div
+          ref={detailRef}
+          className="mt-2 overflow-hidden rounded-xl border border-slate-200 scroll-mb-24 dark:border-slate-700"
+        >
+          <ExpandedDetail lead={lead} isAdmin={isAdmin} onEdit={onEdit} compact />
         </div>
       )}
     </div>

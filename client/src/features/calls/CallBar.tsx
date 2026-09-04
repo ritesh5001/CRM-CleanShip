@@ -61,7 +61,9 @@ export function CallBar() {
     phase === 'connecting' ? 'Connecting…' : phase === 'ringing' ? 'Ringing…' : fmtElapsed(elapsed);
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 px-3 pb-4 sm:bottom-4">
+    // On a phone the bar floats just above the tab bar (and the home
+    // indicator) rather than burying it — the user can still navigate mid-call.
+    <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-50 flex flex-col items-center gap-2 px-3 pb-2 md:bottom-4 md:pb-0">
       {keypadOpen && (
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-2 flex h-6 items-center justify-between">
@@ -100,7 +102,7 @@ export function CallBar() {
           disabled={phase !== 'in_call'}
           title={phase === 'in_call' ? 'Keypad (for phone menus)' : 'Keypad available once connected'}
           aria-pressed={keypadOpen}
-          className={`rounded-full p-2.5 disabled:opacity-40 ${
+          className={`tap flex items-center justify-center rounded-full p-3 disabled:opacity-40 md:p-2.5 ${
             keypadOpen
               ? 'bg-brand-600 text-white hover:bg-brand-700'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -112,14 +114,14 @@ export function CallBar() {
           onClick={toggleMute}
           disabled={phase !== 'in_call'}
           title={muted ? 'Unmute' : 'Mute'}
-          className="rounded-full p-2.5 text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="tap flex items-center justify-center rounded-full p-3 text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800 md:p-2.5"
         >
           {muted ? <MicOff size={18} /> : <Mic size={18} />}
         </button>
         <button
           onClick={hangup}
           title="Hang up"
-          className="rounded-full bg-rose-600 p-2.5 text-white hover:bg-rose-700"
+          className="tap flex items-center justify-center rounded-full bg-rose-600 p-3 text-white hover:bg-rose-700 md:p-2.5"
         >
           <PhoneOff size={18} />
         </button>

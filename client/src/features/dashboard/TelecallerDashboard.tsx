@@ -41,24 +41,24 @@ export function TelecallerDashboard() {
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{data.targetProgress}% of daily target</p>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Link to="/contacts">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
+        <Link to="/contacts" className="block h-full">
           <StatCard label="My Contacts" value={data.myContacts} icon={<Contact size={18} />} />
         </Link>
-        <Link to="/leads">
+        <Link to="/leads" className="block h-full">
           <StatCard label="Leads" value={data.myLeads} icon={<Star size={18} />} />
         </Link>
-        <Link to="/tasks">
+        <Link to="/tasks" className="block h-full">
           <StatCard label="Pending Tasks" value={data.pendingTasks} icon={<ListChecks size={18} />} />
         </Link>
-        <Link to="/followups">
+        <Link to="/followups" className="block h-full">
           <StatCard
             label="Follow-ups Today"
             value={data.followUpsToday}
             icon={<CalendarClock size={18} />}
           />
         </Link>
-        <Link to="/followups">
+        <Link to="/followups" className="block h-full">
           <StatCard
             label="Overdue"
             value={data.overdueFollowUps}

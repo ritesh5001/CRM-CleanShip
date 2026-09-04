@@ -47,14 +47,20 @@ export function StatCard({
   icon?: ReactNode;
 }) {
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-          {sub && <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{sub}</p>}
+    <Card className="h-full p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500 sm:text-xs">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-bold text-slate-800 dark:text-slate-100 sm:text-2xl">{value}</p>
+          {sub && <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p>}
         </div>
-        {icon && <div className="rounded-lg bg-brand-50 p-2 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">{icon}</div>}
+        {icon && (
+          <div className="shrink-0 rounded-lg bg-brand-50 p-2 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            {icon}
+          </div>
+        )}
       </div>
     </Card>
   );

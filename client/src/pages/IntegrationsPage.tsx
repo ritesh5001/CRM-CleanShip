@@ -115,14 +115,14 @@ function NumberAssignmentCard({ configured }: { configured: boolean }) {
             // Keep a stale/unknown assigned number visible as an option.
             const known = numberList.some((n) => n.phoneNumber === u.twilioNumber);
             return (
-              <div key={u._id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div key={u._id} className="flex flex-col gap-2 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{u.name}</p>
                   <p className="truncate text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
-                    className="w-56"
+                    className="w-full sm:w-56"
                     value={u.twilioNumber ?? ''}
                     disabled={savingId === u._id}
                     onChange={(e) => handleAssign(u._id, e.target.value)}
@@ -340,19 +340,19 @@ export function IntegrationsPage() {
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               In your Twilio TwiML App, set the <span className="font-medium">Voice Request URL (POST)</span> to:
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                 {data.voiceWebhookUrl}
               </code>
-              <Button size="sm" variant="secondary" onClick={() => copy(data.voiceWebhookUrl)}>
+              <Button size="sm" variant="secondary" className="shrink-0" onClick={() => copy(data.voiceWebhookUrl)}>
                 <Copy size={14} /> Copy
               </Button>
             </div>
           </div>
         )}
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} loading={update.isPending}>
+        <div className="flex sm:justify-end">
+          <Button className="w-full sm:w-auto" onClick={handleSave} loading={update.isPending}>
             Save settings
           </Button>
         </div>

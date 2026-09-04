@@ -132,16 +132,16 @@ function AgentAssignmentCard() {
             const draft = draftFor(u._id, current);
             const dirty = draft.id !== current || draft.password !== '';
             return (
-              <div key={u._id} className="flex flex-wrap items-end justify-between gap-3 py-3">
+              <div key={u._id} className="flex flex-col gap-2 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{u.name}</p>
                   <p className="truncate text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
                 </div>
-                <div className="flex flex-wrap items-end gap-2">
+                <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
                   <div>
                     <Label>Agent id</Label>
                     <Input
-                      className="w-40"
+                      className="sm:w-40"
                       placeholder="103_1111113"
                       value={draft.id}
                       onChange={(e) => setDrafts((d) => ({ ...d, [u._id]: { ...draft, id: e.target.value } }))}
@@ -150,7 +150,7 @@ function AgentAssignmentCard() {
                   <div>
                     <Label>Password</Label>
                     <Input
-                      className="w-40"
+                      className="sm:w-40"
                       type="password"
                       placeholder={current ? '•••••••• (saved)' : 'Agent password'}
                       value={draft.password}
@@ -158,6 +158,7 @@ function AgentAssignmentCard() {
                     />
                   </div>
                   <Button
+                    className="col-span-2"
                     variant="secondary"
                     disabled={!dirty || savingId === u._id}
                     onClick={() => save(u._id, current)}
