@@ -11,7 +11,7 @@ import { useTelecallers, useSetTelecallerTelecmi } from '@/api/users';
 import { apiError } from '@/api/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label, Select } from '@/components/ui/Field';
-import { Badge, Card, Spinner } from '@/components/ui/Misc';
+import { Badge, Card, Spinner, Toggle } from '@/components/ui/Misc';
 
 interface FormState {
   enabled: boolean;
@@ -48,26 +48,6 @@ const EMPTY: FormState = {
   publicServerUrl: '',
   apiSecret: '',
 };
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-        checked ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
-      }`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
-  );
-}
 
 /**
  * Assign each telecaller their TeleCMI agent. The agent id comes from the TeleCMI

@@ -197,7 +197,8 @@ errors → `{ success: false, message, details? }` via the central `errorHandler
 - Routing in `routes/router.tsx`; guards `ProtectedRoute` / `RoleRoute` in `routes/guards.tsx`.
 - Role-aware pages (`pages/*`) branch on `useAuthStore().user.role`; the dashboard renders
   `SuperadminDashboard` or `TelecallerDashboard`.
-- Reusable UI in `components/ui/` (Button, Field, Modal, Misc, Sheet). Feature modals in `features/*`.
+- Reusable UI in `components/ui/` (Button, Field, Modal, Misc — incl. `Toggle` —, Sheet).
+  Feature modals in `features/*`.
 - Formatting/click-to-call helpers in `lib/format.ts`; label/color maps in `lib/constants.ts`.
   Country dialling codes/timezones/ISO in `lib/countries.ts`; `<CountryTime>`
   (`components/CountryTime.tsx`) shows a country's live local time (contacts Location cell).
@@ -217,11 +218,21 @@ rendering a *different component*, not a different style; everything else is
 Tailwind breakpoints.
 
 - **Navigation** (`components/layout/AppLayout.tsx`): desktop keeps the sidebar;
-  the phone gets a five-slot tab bar — the four routes in `MOBILE_PRIMARY[role]`
-  (`components/layout/nav.ts`) plus **More**, a `Sheet` holding the *complete*
-  nav, the account row, the theme switch and Log out. Nine tabs do not fit
-  across a phone, so anything not in `MOBILE_PRIMARY` is one tap away, never
-  gone. Add a new route to `NAV` and it appears in More automatically.
+  the phone gets a five-slot tab bar — four routes plus **More**, a `Sheet`
+  holding the *complete* nav, the account row, Customize, the theme switch and
+  Log out. Nine tabs do not fit across a phone, so anything without a tab is one
+  tap away, never gone. Add a route to `NAV` and it shows up in both.
+- **The menu is customizable per user** (`components/layout/NavCustomizer.tsx`,
+  opened from *Customize* in the sidebar footer and from the More sheet). Users
+  switch off pages they don't use and pin up to `MAX_MOBILE_TABS` routes to
+  their phone tab bar; state lives in `ui.ts` as `navHidden`/`navTabs`, **keyed
+  by role** so an admin and a telecaller sharing a browser don't inherit each
+  other's menu. Always read the menu through `visibleNav(role, hidden)` and
+  `tabNav(role, hidden, tabs)` (`nav.ts`) rather than `NAV[role]` directly —
+  those apply the fallbacks (an explicit tab choice wins; otherwise
+  `MOBILE_PRIMARY` topped up from what's still visible). Hiding is a *menu*
+  preference, not a permission: the route keeps working for deep links and
+  notifications, and the last visible page can't be switched off.
 - **Tables become cards.** `ContactsTable` and `TaskTable` each render a card
   list under `md:hidden` and the table under `hidden md:block` — the same data
   and the same mutations, laid out vertically. The contacts card carries the

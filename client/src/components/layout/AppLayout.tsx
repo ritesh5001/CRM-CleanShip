@@ -8,6 +8,7 @@ import {
   Sun,
   Moon,
   MoreHorizontal,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
@@ -17,7 +18,8 @@ import { useCallStore } from '@/store/call';
 import { CallBar } from '@/features/calls/CallBar';
 import { CallDispositionModal } from '@/features/calls/CallDispositionModal';
 import { Sheet } from '@/components/ui/Sheet';
-import { MOBILE_PRIMARY, NAV, type NavItem } from './nav';
+import { tabNav, visibleNav } from './nav';
+import { NavCustomizer } from './NavCustomizer';
 import { NotificationBell } from './NotificationBell';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
@@ -39,17 +41,19 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const clearWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const items = user ? NAV[user.role] : [];
+
+  // The menu is per-user: pages they've switched off are gone from the sidebar
+  // and the More sheet, and they choose which routes get a phone tab.
+  const navHidden = useUiStore((s) => s.navHidden);
+  const navTabs = useUiStore((s) => s.navTabs);
+  const items = user ? visibleNav(user.role, navHidden[user.role]) : [];
+  const tabs = user ? tabNav(user.role, navHidden[user.role], navTabs[user.role]) : [];
 
   const [moreOpen, setMoreOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   // A tab-bar destination shouldn't leave the sheet hanging over the new page.
   useEffect(() => setMoreOpen(false), [location.pathname]);
-
-  const primaryRoutes = user ? MOBILE_PRIMARY[user.role] : [];
-  const tabs = primaryRoutes
-    .map((to) => items.find((i) => i.to === to))
-    .filter((i): i is NavItem => !!i);
   // Anything not on the tab bar is only reachable through More — highlight the
   // More button itself so the user still knows where they are.
   const moreIsActive = !tabs.some(
@@ -98,6 +102,16 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+        <button
+          onClick={() => setCustomizeOpen(true)}
+          title="Customize menu"
+          className={`flex items-center px-3 py-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 ${
+            collapsed ? 'justify-center' : 'gap-3 px-5'
+          }`}
+        >
+          <SlidersHorizontal size={18} />
+          {!collapsed && 'Customize'}
+        </button>
         <button
           onClick={toggleSidebar}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -210,6 +224,15 @@ export function AppLayout() {
             <p className="truncate text-xs text-slate-400 dark:text-slate-500">{user?.email}</p>
           </div>
           <button
+            onClick={() => {
+              setMoreOpen(false);
+              setCustomizeOpen(true);
+            }}
+            className="tap flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <SlidersHorizontal size={18} /> Customize menu
+          </button>
+          <button
             onClick={toggleTheme}
             className="tap flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
           >
@@ -224,6 +247,10 @@ export function AppLayout() {
           </button>
         </div>
       </Sheet>
+
+      {user && (
+        <NavCustomizer role={user.role} open={customizeOpen} onClose={() => setCustomizeOpen(false)} />
+      )}
 
       {/* Global softphone UI (no-op until a call is placed). */}
       <CallBar />

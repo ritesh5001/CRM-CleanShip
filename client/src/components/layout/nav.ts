@@ -11,6 +11,7 @@ import {
   Phone,
   type LucideIcon,
 } from 'lucide-react';
+import { MAX_MOBILE_TABS } from '@/store/ui';
 import type { Role } from '@/types';
 
 export interface NavItem {
@@ -57,3 +58,31 @@ export const MOBILE_PRIMARY: Record<Role, string[]> = {
   superadmin: ['/', '/contacts', '/leads', '/tasks'],
   telecaller: ['/', '/contacts', '/tasks', '/followups'],
 };
+
+/** The menu as this user has it: everything they haven't switched off. */
+export function visibleNav(role: Role, hidden: string[] = []): NavItem[] {
+  return NAV[role].filter((i) => !hidden.includes(i.to));
+}
+
+/**
+ * The phone tab bar for this user.
+ *
+ * An explicit choice wins outright — if they pinned two tabs, they get two, and
+ * everything else lives in More. With no choice made we fall back to
+ * `MOBILE_PRIMARY` and top it up from whatever else is visible, so the bar is
+ * never short just because a default route was switched off.
+ */
+export function tabNav(role: Role, hidden: string[] = [], tabs: string[] = []): NavItem[] {
+  const visible = visibleNav(role, hidden);
+  const byRoute = (to: string) => visible.find((i) => i.to === to);
+
+  const pinned = tabs.map(byRoute).filter((i): i is NavItem => !!i);
+  if (pinned.length) return pinned.slice(0, MAX_MOBILE_TABS);
+
+  const picked = MOBILE_PRIMARY[role].map(byRoute).filter((i): i is NavItem => !!i);
+  for (const item of visible) {
+    if (picked.length >= MAX_MOBILE_TABS) break;
+    if (!picked.some((p) => p.to === item.to)) picked.push(item);
+  }
+  return picked.slice(0, MAX_MOBILE_TABS);
+}
