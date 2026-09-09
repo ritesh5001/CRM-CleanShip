@@ -310,6 +310,8 @@ export const updateTask = asyncHandler(async (req: Request, res: Response) => {
   if (typeof assignedTo === 'string' && assignedTo && assignedTo !== previousAssignee) {
     const [valid] = await resolveAssignees([assignedTo], String(req.workspaceId));
     task.assignedTo = new Types.ObjectId(valid);
+    // Handing the task to someone else restarts the clock for them.
+    task.assignedAt = new Date();
   }
 
   if (relatedLead === null) task.relatedLead = undefined;

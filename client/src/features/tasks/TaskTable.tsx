@@ -4,9 +4,16 @@ import toast from 'react-hot-toast';
 import { useDeleteTask, useUpdateTask, useUpdateTaskStatus } from '@/api/tasks';
 import { apiError } from '@/api/client';
 import { PRIORITY_COLORS, TASK_STATUS_COLORS, TASK_STATUS_LABELS } from '@/lib/constants';
-import { fmtDueLabel, fmtMinutes, fmtStamp, fromDateInput, toDateInput } from '@/lib/format';
+import { fmtDateTime, fmtDueLabel, fmtMinutes, fmtStamp, fromDateInput, toDateInput } from '@/lib/format';
 import { formatPhoneDisplay } from '@/lib/phone';
-import { TASK_TYPE_LABELS, completionInstant, isTaskOverdue, localDateInput, sameDay } from './taskHelpers';
+import {
+  TASK_TYPE_LABELS,
+  assignedOn,
+  completionInstant,
+  isTaskOverdue,
+  localDateInput,
+  sameDay,
+} from './taskHelpers';
 import type { Lead, Task, TaskStatus, TaskType, User } from '@/types';
 
 const CELL =
@@ -38,7 +45,8 @@ export function TaskTable({ tasks, isAdmin, people, openId, onOpenHandled }: Pro
     onOpenHandled?.();
   }, [openId, onOpenHandled]);
 
-  const cols = isAdmin ? 8 : 6;
+  // done · task · [assignee] · assigned · due · priority · status · completed · actions
+  const cols = isAdmin ? 9 : 8;
 
   const toggleFor = (id: string) => (mode: OpenMode) =>
     setOpen((cur) => (cur?.id === id && cur.mode === mode ? null : { id, mode }));
@@ -64,7 +72,7 @@ export function TaskTable({ tasks, isAdmin, people, openId, onOpenHandled }: Pro
 
       {/* Desktop table */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[60rem] border-collapse">
+        <table className="w-full min-w-[66rem] border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800/70">
             <tr className="border-b border-slate-200 dark:border-slate-700">
               <th className={`${TH} w-9`}>
@@ -72,6 +80,7 @@ export function TaskTable({ tasks, isAdmin, people, openId, onOpenHandled }: Pro
               </th>
               <th className={TH}>Task</th>
               {isAdmin && <th className={`${TH} w-32`}>Assignee</th>}
+              <th className={`${TH} w-28`}>Assigned</th>
               <th className={`${TH} w-32`}>Due</th>
               <th className={`${TH} w-28`}>Priority</th>
               <th className={`${TH} w-32`}>Status</th>
@@ -224,6 +233,12 @@ function TaskCard({
           }`}
         >
           {fmtDueLabel(task.dueDate)}
+        </span>
+        <span
+          className="rounded-full bg-slate-100 px-2 py-0.5 tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+          title={`Assigned ${fmtDateTime(assignedOn(task))}`}
+        >
+          Assigned {fmtStamp(assignedOn(task))}
         </span>
         <span className={`rounded-full px-2 py-0.5 font-medium capitalize ${PRIORITY_COLORS[task.priority]}`}>
           {task.priority}
@@ -401,6 +416,15 @@ function TaskRow({
             </select>
           </td>
         )}
+
+        <td className="px-2.5 py-2 align-top">
+          <span
+            className="whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400"
+            title={fmtDateTime(assignedOn(task))}
+          >
+            {fmtStamp(assignedOn(task))}
+          </span>
+        </td>
 
         <td className="px-2.5 py-2 align-top">
           <span
@@ -758,7 +782,8 @@ function DetailsPanel({ task, isAdmin, onClose }: { task: Task; isAdmin: boolean
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-400 dark:text-slate-500">
         <span>Assigned by {nameOf(task.assignedBy)}</span>
-        <span>Created {fmtStamp(task.createdAt)}</span>
+        <span>Assigned {fmtStamp(assignedOn(task))}</span>
+        {assignedOn(task) !== task.createdAt && <span>Created {fmtStamp(task.createdAt)}</span>}
         {task.startedAt && task.startedAt !== task.completedAt && <span>Started {fmtStamp(task.startedAt)}</span>}
         {lead && (
           <span className="inline-flex items-center gap-1">

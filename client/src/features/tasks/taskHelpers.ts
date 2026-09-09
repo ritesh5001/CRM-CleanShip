@@ -13,6 +13,15 @@ export function isOpen(task: Task) {
 }
 
 /**
+ * When the task was handed to its current assignee. Tasks created before
+ * `assignedAt` existed have none, and for those the creation date *is* the
+ * assignment date — assigning is how a task comes into being here.
+ */
+export function assignedOn(task: Task): string {
+  return task.assignedAt ?? task.createdAt;
+}
+
+/**
  * A due date carrying a time is overdue the moment it passes; a date-only due
  * date (midnight) only goes overdue once the day is over.
  */

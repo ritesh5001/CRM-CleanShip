@@ -12,6 +12,14 @@ const taskSchema = new Schema(
     relatedLead: { type: Schema.Types.ObjectId, ref: 'Lead' },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    /**
+     * When this task was handed to its current assignee — set on create and
+     * re-stamped on reassignment, so it answers "how long has this been sitting
+     * with them?" rather than "when did the task first exist?" (that's
+     * `createdAt`). Tasks that predate the field fall back to `createdAt` in the
+     * UI, so no backfill is needed.
+     */
+    assignedAt: { type: Date, default: Date.now },
     dueDate: { type: Date },
     priority: { type: String, enum: TASK_PRIORITIES, default: 'medium' },
     status: { type: String, enum: TASK_STATUSES, default: 'pending', index: true },

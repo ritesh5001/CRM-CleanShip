@@ -107,6 +107,9 @@ export interface Task {
   relatedLead?: Lead | string | null;
   assignedTo?: User | string;
   assignedBy?: User | string;
+  /** When it was handed to the current assignee. Absent on tasks created before
+   *  the field existed — fall back to `createdAt` via `assignedOn()`. */
+  assignedAt?: string;
   dueDate?: string;
   priority: 'low' | 'medium' | 'high';
   status: TaskStatus;

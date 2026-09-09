@@ -86,8 +86,12 @@ Every tenant-scoped model (Lead, Task, CallLog, FollowUp, Notification, ImportBa
   `phoneNOutcome`, its `remarks[].phone` tags and its `CallLog.phone` rows with it (`compactLeadPhones`
   in `leadController`). Existing data was backfilled by `scripts/compactPhones.ts`.
 - **Task** — `title, description, type(call|follow_up|custom), relatedLead, assignedTo, assignedBy,
-  dueDate, priority, status(pending|in_progress|completed|cancelled), startedAt, completedAt,
-  completedBy, completionNote, timeSpentMin`. Task dates are **date-only — no clock anywhere** in
+  assignedAt, dueDate, priority, status(pending|in_progress|completed|cancelled), startedAt,
+  completedAt, completedBy, completionNote, timeSpentMin`. `assignedAt` is when the task reached its
+  *current* assignee — stamped on create and re-stamped on reassignment, so it answers "how long has
+  this been sitting with them?" rather than `createdAt`'s "when did it first exist?". Tasks created
+  before the field have none; the client falls back via `assignedOn(task)`
+  (`features/tasks/taskHelpers.ts`), so no backfill is needed. Task dates are **date-only — no clock anywhere** in
   the UI (`fmtDueLabel` / `fmtStamp` render days; the inputs are `type="date"`).
   **`completedAt` is when the work was actually done, not when the button was clicked** — the
   telecaller picks the day inline in the table row (Today / Yesterday chips). A picked day becomes
@@ -393,9 +397,12 @@ authenticates, so omitting them 400s regardless of credentials.
   clicking the row's tick, expands a **completion strip** in a second `<tr>` where the telecaller
   reports *when* they did it, the time spent and a note. The chevron expands a **details row**
   (admin edits title/details/due/type in place; both roles see the completion record).
-- Fixed column widths total ~48rem, so the table sets `min-w-[60rem]` inside an `overflow-x-auto`
-  wrapper — otherwise the Task column starves and titles wrap one word per line. Everything fits
-  from ~1280px; below that the table (not the page) scrolls.
+- Columns are Done · Task · [Assignee] · **Assigned** · Due · Priority · Status · Completed ·
+  Actions. Their fixed widths total ~55rem, so the table sets `min-w-[66rem]` inside an
+  `overflow-x-auto` wrapper — otherwise the Task column starves and titles wrap one word per line.
+  Below ~1400px the table (not the page) scrolls. The expanded completion/details `<tr>` uses a
+  `colSpan` counted from the columns actually rendered (9 admin / 8 telecaller) — hardcoding it
+  silently truncates the panel for whichever role has fewer columns.
 - Badge colour maps in `lib/constants.ts` carry explicit `dark:` pairs — the app is used in dark mode.
 
 ## Notes for future work
